@@ -1,4 +1,5 @@
 #include "photo_web_pages.h"
+#include "epdoptimize_bundle.h"
 #include "wifi_manager.h"
 #include "nvs_manager.h"
 #include "display_bsp.h"
@@ -17,7 +18,6 @@
 
 static const char *TAG = "photoweb";
 static httpd_handle_t server = NULL;
-static void add_cors(httpd_req_t *req);
 
 // Extern from PhotoFrame_mode.cpp
 extern uint32_t photo_img_count;
@@ -146,17 +146,8 @@ static esp_err_t api_upload(httpd_req_t *req)
         total += ret;
     }
 
-    // 尝试从 URL 查询串读取自定义文件名 (?name=xxx)
-    char qbuf[256], fname[128] = {0};
-    if (httpd_req_get_url_query_str(req, qbuf, sizeof(qbuf)) == ESP_OK) {
-        httpd_query_key_value(qbuf, "name", fname, sizeof(fname));
-    }
-    char filepath[300];
-    if (fname[0]) {
-        snprintf(filepath, sizeof(filepath), "/sdcard/photos/%s.bmp", fname);
-    } else {
-        snprintf(filepath, sizeof(filepath), "/sdcard/photos/%d.bmp", (int)photo_img_count);
-    }
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "/sdcard/photos/%d.bmp", (int)photo_img_count);
 
     esp_err_t ret = SDPort->SDPort_WriteFile(filepath, buf, req->content_len);
     free(buf);
@@ -253,6 +244,13 @@ static esp_err_t api_reboot(httpd_req_t *req) {
     return ESP_OK;
 }
 
+/* ---- GET /lib/epdoptimize.js ---- */
+static esp_err_t serve_epdoptimize(httpd_req_t *req) {
+    httpd_resp_set_type(req, "application/javascript; charset=utf-8");
+    httpd_resp_send(req, EPDOPTIMIZE_JS, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
 /* ---- GET / ---- */
 static esp_err_t serve_index(httpd_req_t *req) {
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -281,8 +279,12 @@ extern "C" void photo_web_server_init(void)
     config.max_uri_handlers = 16;
     if (httpd_start(&server, &config) == ESP_OK) {
         ESP_LOGI(TAG, "Web 服务器已启动, 端口 %d", config.server_port);
+<<<<<<< Updated upstream
+        register_get("/lib/epdoptimize.js", serve_epdoptimize);
+=======
         httpd_uri_t opt = {.uri = "/*", .method = HTTP_OPTIONS, .handler = cors_options};
         httpd_register_uri_handler(server, &opt);
+>>>>>>> Stashed changes
         register_get("/", serve_index);
         register_get("/api/status", api_get_status);
         register_get("/api/photos", api_photos_get);
@@ -290,8 +292,6 @@ extern "C" void photo_web_server_init(void)
         register_post("/api/wifi/connect", api_wifi_connect);
         register_post("/api/wifi/reset", api_wifi_reset);
         register_post("/api/upload", api_upload);
-        httpd_uri_t opt_up = {.uri = "/api/upload", .method = HTTP_OPTIONS, .handler = cors_options};
-        httpd_register_uri_handler(server, &opt_up);
         register_post("/api/delete", api_delete);
         register_get("/api/adjustments", api_adjustments_get);
         register_post("/api/adjustments", api_adjustments_post);
