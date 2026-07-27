@@ -30,7 +30,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#c9d
 .val-blue{color:#58a6ff}
 .val-red{color:#f85149}
 .compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
-.compare img{width:100%;max-height:340px;object-fit:contain;border-radius:6px;border:1px solid var(--border)}
+.compare img{width:100%;height:280px;object-fit:contain;border-radius:6px;border:1px solid var(--border)}
 .compare .label{font-size:11px;color:var(--muted);text-align:center;margin-top:2px}
 .info-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:clamp(12px,1.3vw,14px);border-bottom:1px solid var(--border)}
 .info-row:last-child{border-bottom:none}
@@ -64,6 +64,7 @@ select{padding:6px 8px;border-radius:6px;border:1px solid #30363d;background:var
 .msg-ok{color:#3fb950}
 .msg-err{color:#f85149}
 details summary{font-size:clamp(12px,1.5vw,15px);color:var(--muted);cursor:pointer;padding:4px 0}
+details{margin-bottom:4px}
 .upload-zone{border:2px dashed #30363d;border-radius:8px;padding:20px;text-align:center;cursor:pointer;margin:8px 0}
 .upload-zone:hover{border-color:#58a6ff}
 #upload-progress{display:none;height:4px;background:#30363d;border-radius:2px;margin:6px 0}
@@ -85,10 +86,12 @@ details summary{font-size:clamp(12px,1.5vw,15px);color:var(--muted);cursor:point
 <div class="cell"><div class="lbl">湿度</div><div class="val val-blue" id="s-rh">--</div><div class="unit">%</div></div>
 </div>
 </div>
-<div class="card" id="wifi-card">
-<h2>WiFi 配网</h2>
-<details id="wifi-details">
-<summary>展开配置</summary>
+
+<div class="card">
+<h2>设置</h2>
+
+<details id="wifi-details" style="margin-bottom:8px">
+<summary>WiFi 配网</summary>
 <p style="margin:6px 0;font-size:13px">AP: <b>PhotoFrame</b> / 密码: <b>12345678</b></p>
 <button class="btn btn-blue" onclick="window.scanWifi()" style="margin-bottom:8px">扫描网络</button>
 <div id="ssid-list"></div>
@@ -98,7 +101,19 @@ details summary{font-size:clamp(12px,1.5vw,15px);color:var(--muted);cursor:point
 <p class="msg" id="wifi-msg"></p>
 <button class="btn btn-red" onclick="window.resetWifi()" style="margin-top:6px">重置 WiFi</button>
 </details>
+
+<details style="margin-bottom:8px" open>
+<summary>相框设置</summary>
+<div class="info-row"><span class="key">轮播间隔 (分钟)</span><input id="set-interval" type="number" min="1" max="1440" style="width:120px;margin:0"></div>
+<div class="toggle-row"><span class="key">自动轮播</span><span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span></div>
+<div class="info-row"><span class="key">休眠开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
+<div class="info-row"><span class="key">休眠结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
+<button class="btn btn-green" onclick="window.saveSettings()" style="margin-top:6px">保存设置</button>
+</details>
+
+<button class="btn btn-red" onclick="window.rebootDevice()">重启设备</button>
 </div>
+
 <div class="card">
 <h2>相框状态</h2>
 <div class="grid2">
@@ -138,17 +153,8 @@ details summary{font-size:clamp(12px,1.5vw,15px);color:var(--muted);cursor:point
 <h2>图片列表 (<span id="photo-count">0</span>)</h2>
 <div id="photo-list" style="max-height:200px;overflow-y:auto"><p style="color:var(--muted);font-size:12px">加载中...</p></div>
 </div>
-<div class="card">
-<h2>设置</h2>
-<div class="info-row"><span class="key">轮播间隔 (分钟)</span><input id="set-interval" type="number" min="1" max="1440" style="width:120px;margin:0"></div>
-<div class="toggle-row"><span class="key">自动轮播</span><span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span></div>
-<div class="info-row"><span class="key">休眠开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
-<div class="info-row"><span class="key">休眠结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
-<button class="btn btn-green" onclick="window.saveSettings()">保存设置</button>
-</div>
-<div class="card">
-<button class="btn btn-red" onclick="window.rebootDevice()">重启设备</button>
-</div>
+
+
 </div>
 <script type="module">
 import { ditherImage, replaceColors, aitjcizeSpectra6Palette }
