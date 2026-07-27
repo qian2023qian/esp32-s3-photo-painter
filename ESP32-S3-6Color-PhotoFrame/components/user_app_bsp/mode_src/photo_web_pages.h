@@ -30,7 +30,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#c9d
 .val-blue{color:#58a6ff}
 .val-red{color:#f85149}
 .compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
-.compare img{width:100%;height:280px;object-fit:contain;border-radius:6px;border:1px solid var(--border)}
+.compare img{width:100%;height:220px;object-fit:contain;border-radius:6px;border:1px solid var(--border)}
 .compare .label{font-size:11px;color:var(--muted);text-align:center;margin-top:2px}
 .info-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:clamp(12px,1.3vw,14px);border-bottom:1px solid var(--border)}
 .info-row:last-child{border-bottom:none}
@@ -63,14 +63,22 @@ select{padding:6px 8px;border-radius:6px;border:1px solid #30363d;background:var
 .msg{font-size:clamp(10px,1.1vw,13px);margin-top:6px}
 .msg-ok{color:#3fb950}
 .msg-err{color:#f85149}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;max-height:300px;overflow-y:auto;padding:4px 0}
+.photo-item{cursor:pointer;text-align:center;background:var(--cell);border-radius:6px;padding:4px;position:relative;transition:background .15s}
+.photo-item:hover{background:#1f2a3a}
+.photo-item img{width:100%;aspect-ratio:800/480;object-fit:cover;border-radius:3px;display:block}
+.photo-item .pname{font-size:9px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.photo-item .del{position:absolute;top:2px;right:2px;background:#da3633;color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:14px;cursor:pointer;display:none}
+.photo-item:hover .del{display:block}
+@media(min-width:768px){.photo-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));max-height:400px}}
 details summary{font-size:clamp(12px,1.5vw,15px);color:var(--muted);cursor:pointer;padding:4px 0}
 details{margin-bottom:4px}
 .upload-zone{border:2px dashed #30363d;border-radius:8px;padding:20px;text-align:center;cursor:pointer;margin:8px 0}
 .upload-zone:hover{border-color:#58a6ff}
 #upload-progress{display:none;height:4px;background:#30363d;border-radius:2px;margin:6px 0}
 #upload-progress div{height:100%;background:#238636;border-radius:2px;width:0}
-@media(min-width:768px){body{padding:16px}.dash{max-width:640px}}
-@media(min-width:1024px){body{padding:20px}.dash{max-width:700px}}
+@media(min-width:768px){body{padding:16px}.dash{max-width:640px}.compare img{height:340px}}
+@media(min-width:1024px){body{padding:20px}.dash{max-width:900px}.compare img{height:400px}}
 </style>
 </head>
 <body>
@@ -151,7 +159,7 @@ details{margin-bottom:4px}
 </div>
 <div class="card">
 <h2>图片列表 (<span id="photo-count">0</span>)</h2>
-<div id="photo-list" style="max-height:200px;overflow-y:auto"><p style="color:var(--muted);font-size:12px">加载中...</p></div>
+<div class="photo-grid" id="photo-list"><p style="color:var(--muted);font-size:12px">加载中...</p></div>
 </div>
 
 
@@ -365,8 +373,8 @@ img.src=URL.createObjectURL(new Blob([processedBmp],{type:'image/bmp'}))}
 function uploadPhoto(){
 if(!processedBmp||!fileFlag){alert('请先选择图片');return}
 let p=$('upload-progress');p.style.display='block';
-let x=new XMLHttpRequest();x.open('POST','/api/upload');
-x.setRequestHeader('X-Filename','phone_photo.bmp');
+let a=getAdj();let q='?name='+encodeURIComponent($('adj-pipe').value+'_'+a.dither+'_br'+a.br+'_ct'+a.ct+'_st'+a.st+'_sh'+a.sh+'_df'+a.df);
+let x=new XMLHttpRequest();x.open('POST','/api/upload'+q);
 x.upload.onprogress=function(e){p.firstChild.style.width=(e.loaded/e.total*100)+'%'};
 x.onload=function(){p.style.display='none';setMsg('upload-msg',x.status==200?'已显示到屏幕！':'上传失败',x.status==200);
 if(x.status==200){updateStatus();refreshPhotos()}};
@@ -375,7 +383,7 @@ x.send(processedBmp)}
 window.$=$;
 window.setMsg=setMsg;window.api=api;
 window.updateStatus=updateStatus;window.refreshPhotos=refreshPhotos;
-window.delPhoto=delPhoto;
+window.delPhoto=delPhoto;window.switchPhoto=switchPhoto;window.calibrateThumb=calibrateThumb;
 window.scanWifi=scanWifi;window.connectWifi=connectWifi;window.resetWifi=resetWifi;
 window.saveSettings=saveSettings;window.updateToggle=updateToggle;
 window.toggleRunning=toggleRunning;window.loadSettings=loadSettings;

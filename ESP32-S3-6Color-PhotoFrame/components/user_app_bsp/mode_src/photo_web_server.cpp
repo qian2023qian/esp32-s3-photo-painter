@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <time.h>
 
 static const char *TAG = "photoweb";
 static httpd_handle_t server = NULL;
@@ -264,6 +265,59 @@ static esp_err_t serve_opendisplay(httpd_req_t *req) {
     return ESP_OK;
 }
 
+/* ---- GET /api/photo ---- */
+static esp_err_t api_photo_get(httpd_req_t *req)
+{
+    char qbuf[256], fname[128] = {0};
+    if (httpd_req_get_url_query_str(req, qbuf, sizeof(qbuf)) == ESP_OK) {
+        httpd_query_key_value(qbuf, "name", fname, sizeof(fname));
+    }
+    if (!fname[0]) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing name"); return ESP_FAIL; }
+    char path[300];
+    snprintf(path, sizeof(path), "/sdcard/photos/%s", fname);
+    // Read file
+    FILE *fp = fopen(path, "rb");
+    if (!fp) { httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File not found"); return ESP_FAIL; }
+    fseek(fp, 0, SEEK_END); long sz = ftell(fp); fseek(fp, 0, SEEK_SET);
+    if (sz <= 0 || sz > 2*1024*1024) { fclose(fp); httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Bad file"); return ESP_FAIL; }
+    uint8_t *buf = (uint8_t *)heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
+    if (!buf) { fclose(fp); httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM"); return ESP_FAIL; }
+    fread(buf, 1, sz, fp); fclose(fp);
+    httpd_resp_set_type(req, "image/bmp");
+    httpd_resp_send(req, (const char *)buf, sz);
+    free(buf);
+    return ESP_OK;
+}
+
+/* ---- POST /api/switch ---- */
+static time_t last_switch_time = 0;
+extern uint32_t photo_img_index;
+extern EventGroupHandle_t epaper_groups;
+static esp_err_t api_switch_post(httpd_req_t *req)
+{
+    time_t now; time(&now);
+    if (now - last_switch_time < 15) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"请等待15秒后再切换\"}");
+        return ESP_OK;
+    }
+    char buf[64]; int len = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (len <= 0) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data"); return ESP_FAIL; }
+    buf[len] = '\0';
+    cJSON *json = cJSON_Parse(buf);
+    if (!json) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad JSON"); return ESP_FAIL; }
+    cJSON *item = cJSON_GetObjectItem(json, "index");
+    if (item && cJSON_IsNumber(item)) {
+        photo_img_index = item->valueint;
+        last_switch_time = now;
+        xEventGroupSetBits(epaper_groups, set_bit_button(0));
+    }
+    cJSON_Delete(json);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"ok\":true}");
+    return ESP_OK;
+}
+
 /* ---- GET / ---- */
 static esp_err_t serve_index(httpd_req_t *req) {
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -289,7 +343,7 @@ static void register_post(const char *p, esp_err_t (*h)(httpd_req_t *)) {
 extern "C" void photo_web_server_init(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 16;
+    config.max_uri_handlers = 20;
     if (httpd_start(&server, &config) == ESP_OK) {
         ESP_LOGI(TAG, "Web 服务器已启动, 端口 %d", config.server_port);
         httpd_uri_t opt = {.uri = "/*", .method = HTTP_OPTIONS, .handler = cors_options};
@@ -307,6 +361,8 @@ extern "C" void photo_web_server_init(void)
         register_get("/api/adjustments", api_adjustments_get);
         register_post("/api/adjustments", api_adjustments_post);
         register_post("/api/settings", api_settings_post);
+        register_get("/api/photo", api_photo_get);
+        register_post("/api/switch", api_switch_post);
         register_post("/api/reboot", api_reboot);
     }
 }
