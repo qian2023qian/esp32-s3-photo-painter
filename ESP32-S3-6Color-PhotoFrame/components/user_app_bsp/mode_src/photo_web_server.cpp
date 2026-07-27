@@ -19,6 +19,7 @@
 
 static const char *TAG = "photoweb";
 static httpd_handle_t server = NULL;
+static void add_cors(httpd_req_t *req);
 
 // Extern from PhotoFrame_mode.cpp
 extern uint32_t photo_img_count;
