@@ -122,6 +122,7 @@ details summary{font-size:clamp(12px,1.5vw,15px);color:var(--muted);cursor:point
 <div class="info-row"><span class="key">对比度</span><input type="range" id="adj-ct" min="-50" max="50" value="20" oninput="window.onAdjust()"><span class="adjust-val" id="val-ct">+20</span></div>
 <div class="info-row"><span class="key">饱和度</span><input type="range" id="adj-st" min="-50" max="50" value="20" oninput="window.onAdjust()"><span class="adjust-val" id="val-st">+20</span></div>
 <div class="info-row"><span class="key">锐化</span><input type="range" id="adj-sh" min="0" max="100" value="50" oninput="window.onAdjust()"><span class="adjust-val" id="val-sh">50</span></div>
+<div class="info-row"><span class="key">管线</span><select id="adj-pipe" onchange="window.onPipeChange()"><option value="epdoptimize">epdoptimize</option><option value="opendisplay">OpenDisplay</option></select></div>
 <div class="info-row"><span class="key">抖动模式</span><select id="adj-dither" onchange="window.onAdjust()"><option value="floydSteinberg">Floyd-Steinberg</option><option value="atkinson">Atkinson</option><option value="jarvis">Jarvis-Judice-Ninke</option><option value="stucki">Stucki</option><option value="burkes">Burkes</option><option value="sierra3">Sierra-3</option><option value="sierra2">Sierra-2</option></select></div>
 <div class="info-row"><span class="key">扩散强度</span><input type="range" id="adj-df" min="0" max="200" value="100" oninput="window.onAdjust()"><span class="adjust-val" id="val-df">100</span></div>
 </div>
@@ -149,6 +150,8 @@ details summary{font-size:clamp(12px,1.5vw,15px);color:var(--muted);cursor:point
 <script type="module">
 import { ditherImage, replaceColors, aitjcizeSpectra6Palette }
 from '/lib/epdoptimize.js';
+let odModule=null;
+async function loadOD(){if(!odModule){odModule=await import('/lib/opendisplay.js')}return odModule}
 
 let $=function(id){return document.getElementById(id)};
 let rotateAngle=0, processedBmp=null, fileFlag=0, adjLoaded=false;
@@ -207,7 +210,7 @@ function rebootDevice(){if(confirm('重启设备？'))api('POST','/api/reboot').
 
 function getAdj(){return{
 br:Number($('adj-br').value),ct:Number($('adj-ct').value),st:Number($('adj-st').value),
-sh:Number($('adj-sh').value),dither:$('adj-dither').value,df:Number($('adj-df').value)}}
+sh:Number($('adj-sh').value),dither:$('adj-dither').value,df:Number($('adj-df').value),pipe:$('adj-pipe').value}}
 
 function updateAdjLabels(){
 $('val-br').textContent=(Number($('adj-br').value)>=0?'+':'')+$('adj-br').value;
@@ -223,10 +226,23 @@ if(d.br!==undefined)$('adj-br').value=d.br;
 if(d.ct!==undefined)$('adj-ct').value=d.ct;
 if(d.st!==undefined)$('adj-st').value=d.st;
 if(d.sh!==undefined)$('adj-sh').value=d.sh;
-if(d.dither)$('adj-dither').value=d.dither;
+if(d.dither)$('adj-dither').value=d.dither;if(d.pipe)$('adj-pipe').value=d.pipe;
 if(d.df!==undefined)$('adj-df').value=d.df;
 updateAdjLabels();adjLoaded=true})}
 
+function onPipeChange(){if(fileFlag){runPipeline(sourceCanvas,currentImgW,currentImgH)}}
+function buildOptsOD(){
+let br=Number($('adj-br').value), ct=Number($('adj-ct').value);
+let st=Number($('adj-st').value), sh=Number($('adj-sh').value);
+let df=Number($('adj-df').value);
+return {
+errorDiffusionMatrix: $('adj-dither').value,
+ditheringType: 'errorDiffusion',
+serpentine: true,
+toneMapping: {mode:'contrast',exposure:br/50,saturation:st/50,contrast:ct/50,strength:df/100},
+clarity: {amount:sh/100,radius:1},
+dynamicRangeCompression: {mode:'auto',strength:0.5}
+}}
 function buildOpts(){
 let br=Number($('adj-br').value), ct=Number($('adj-ct').value);
 let st=Number($('adj-st').value), sh=Number($('adj-sh').value);
@@ -250,7 +266,28 @@ processingEngine: 'js',
 adjustmentEngine: 'js'
 }}
 
+var odDM={floydSteinberg:'FLOYD_STEINBERG',atkinson:'ATKINSON',jarvis:'JARVIS_JUDICE_NINKE',stucki:'STUCKI',burkes:'BURKES',sierra3:'SIERRA',sierra2:'SIERRA_LITE'};
+async function runPipelineOD(srcCanvas, tw, th){
+let od=await loadOD();
+let imgData=srcCanvas.getContext('2d').getImageData(0,0,tw,th);
+let mode=od.DitherMode[odDM[$('adj-dither').value]]||od.DitherMode.BURKES;
+let r=od.ditherImage({width:tw,height:th,data:imgData.data},od.ColorScheme.BWGBRY,{mode:mode,serpentine:true});
+let cal=document.getElementById('cb-cal'),dev=document.getElementById('cb-od');
+if(!cal){cal=document.createElement('canvas');cal.id='cb-cal';document.body.appendChild(cal)}
+cal.width=tw;cal.height=th;dev.width=tw;dev.height=th;
+let ci=cal.getContext('2d').createImageData(tw,th);
+for(let i=0;i<r.indices.length;i++){let c=r.palette[r.indices[i]];ci.data[i*4]=c.r;ci.data[i*4+1]=c.g;ci.data[i*4+2]=c.b;ci.data[i*4+3]=255}
+cal.getContext('2d').putImageData(ci,0,0);
+let di=dev.getContext('2d').createImageData(tw,th);
+let devMap={0:[0,0,0],1:[255,255,255],2:[0,255,0],3:[0,0,255],4:[255,0,0],5:[255,255,0]};
+for(let i=0;i<r.indices.length;i++){let dc=devMap[r.indices[i]]||devMap[1];di.data[i*4]=dc[0];di.data[i*4+1]=dc[1];di.data[i*4+2]=dc[2];di.data[i*4+3]=255}
+dev.getContext('2d').putImageData(di,0,0);
+$('preview-processed').src=cal.toDataURL();
+processedBmp=buildBmp(dev, tw, th);
+}
+
 async function runPipeline(srcCanvas, tw, th){
+if($('adj-pipe').value==='opendisplay'){return runPipelineOD(srcCanvas,tw,th)}
 if(!calibratedCanvas){calibratedCanvas=document.createElement('canvas')}
 if(!deviceCanvas){deviceCanvas=document.createElement('canvas')}
 calibratedCanvas.width=tw;calibratedCanvas.height=th;
@@ -336,7 +373,7 @@ window.toggleRunning=toggleRunning;window.loadSettings=loadSettings;
 window.rebootDevice=rebootDevice;
 window.getAdj=getAdj;window.updateAdjLabels=updateAdjLabels;
 window.saveAdjusted=saveAdjusted;window.loadAdjusted=loadAdjusted;
-window.fileChanged=fileChanged;window.onAdjust=onAdjust;
+window.fileChanged=fileChanged;window.onPipeChange=onPipeChange;window.onAdjust=onAdjust;
 window.rotateImg=rotateImg;window.uploadPhoto=uploadPhoto;
 
 setInterval(updateStatus,5000);loadSettings();loadAdjusted();updateStatus();refreshPhotos();

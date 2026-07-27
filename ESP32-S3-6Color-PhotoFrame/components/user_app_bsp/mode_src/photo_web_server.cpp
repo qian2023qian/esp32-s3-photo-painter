@@ -1,5 +1,6 @@
 #include "photo_web_pages.h"
 #include "epdoptimize_bundle.h"
+#include "opendisplay_bundle.h"
 #include "wifi_manager.h"
 #include "nvs_manager.h"
 #include "display_bsp.h"
@@ -251,6 +252,13 @@ static esp_err_t serve_epdoptimize(httpd_req_t *req) {
     return ESP_OK;
 }
 
+/* ---- GET /lib/opendisplay.js ---- */
+static esp_err_t serve_opendisplay(httpd_req_t *req) {
+    httpd_resp_set_type(req, "application/javascript; charset=utf-8");
+    httpd_resp_send(req, OPENDISPLAY_JS, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
 /* ---- GET / ---- */
 static esp_err_t serve_index(httpd_req_t *req) {
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -279,12 +287,10 @@ extern "C" void photo_web_server_init(void)
     config.max_uri_handlers = 16;
     if (httpd_start(&server, &config) == ESP_OK) {
         ESP_LOGI(TAG, "Web 服务器已启动, 端口 %d", config.server_port);
-<<<<<<< Updated upstream
-        register_get("/lib/epdoptimize.js", serve_epdoptimize);
-=======
         httpd_uri_t opt = {.uri = "/*", .method = HTTP_OPTIONS, .handler = cors_options};
         httpd_register_uri_handler(server, &opt);
->>>>>>> Stashed changes
+        register_get("/lib/epdoptimize.js", serve_epdoptimize);
+        register_get("/lib/opendisplay.js", serve_opendisplay);
         register_get("/", serve_index);
         register_get("/api/status", api_get_status);
         register_get("/api/photos", api_photos_get);
