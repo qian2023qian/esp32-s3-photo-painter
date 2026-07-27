@@ -31,6 +31,7 @@ extern ePaperPort ePaperDisplay;
 /* ---- GET /api/status ---- */
 static esp_err_t api_get_status(httpd_req_t *req)
 {
+    add_cors(req);
     cJSON *root = cJSON_CreateObject();
     cJSON_AddBoolToObject(root, "wifi", wifi_manager_is_connected());
     float temp = 0, rh = 0;
@@ -129,6 +130,7 @@ static esp_err_t api_wifi_reset(httpd_req_t *req) {
 /* ---- POST /api/upload ---- */
 static esp_err_t api_upload(httpd_req_t *req)
 {
+    add_cors(req);
     mkdir("/sdcard/photos", 0777);
     if (req->content_len <= 0 || req->content_len > 2 * 1024 * 1024) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid size"); return ESP_FAIL;
@@ -256,6 +258,14 @@ static esp_err_t serve_index(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static void add_cors(httpd_req_t *req) {
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
+}
+static esp_err_t cors_options(httpd_req_t *req) {
+    add_cors(req); httpd_resp_sendstr(req, ""); return ESP_OK;
+}
 static void register_get(const char *p, esp_err_t (*h)(httpd_req_t *)) {
     httpd_uri_t u = {.uri = p, .method = HTTP_GET, .handler = h}; httpd_register_uri_handler(server, &u);
 }
@@ -269,7 +279,12 @@ extern "C" void photo_web_server_init(void)
     config.max_uri_handlers = 16;
     if (httpd_start(&server, &config) == ESP_OK) {
         ESP_LOGI(TAG, "Web 服务器已启动, 端口 %d", config.server_port);
+<<<<<<< Updated upstream
         register_get("/lib/epdoptimize.js", serve_epdoptimize);
+=======
+        httpd_uri_t opt = {.uri = "/*", .method = HTTP_OPTIONS, .handler = cors_options};
+        httpd_register_uri_handler(server, &opt);
+>>>>>>> Stashed changes
         register_get("/", serve_index);
         register_get("/api/status", api_get_status);
         register_get("/api/photos", api_photos_get);
