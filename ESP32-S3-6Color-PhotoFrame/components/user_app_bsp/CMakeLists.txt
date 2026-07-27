@@ -1,0 +1,20 @@
+idf_component_register(
+  SRCS
+  "mode_src/xiaozhi_mode.cpp"
+  "mode_src/PhotoFrame_mode.cpp"
+  "mode_src/Mode_Selection.cpp"
+  "mode_src/wifi_manager.c"
+  "mode_src/nvs_manager.c"
+  "mode_src/photo_web_server.cpp"
+  "user_app.cpp"
+  PRIV_REQUIRES
+  driver
+  nvs_flash
+  esp_wifi
+  esp_http_server
+  main
+  app_bsp
+  codec_board
+  pmicpower
+  port_bsp
+  INCLUDE_DIRS "./")
