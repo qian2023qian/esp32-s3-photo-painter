@@ -146,8 +146,17 @@ static esp_err_t api_upload(httpd_req_t *req)
         total += ret;
     }
 
-    char filepath[256];
-    snprintf(filepath, sizeof(filepath), "/sdcard/photos/%d.bmp", (int)photo_img_count);
+    // 尝试从 URL 查询串读取自定义文件名 (?name=xxx)
+    char qbuf[256], fname[128] = {0};
+    if (httpd_req_get_url_query_str(req, qbuf, sizeof(qbuf)) == ESP_OK) {
+        httpd_query_key_value(qbuf, "name", fname, sizeof(fname));
+    }
+    char filepath[300];
+    if (fname[0]) {
+        snprintf(filepath, sizeof(filepath), "/sdcard/photos/%s.bmp", fname);
+    } else {
+        snprintf(filepath, sizeof(filepath), "/sdcard/photos/%d.bmp", (int)photo_img_count);
+    }
 
     esp_err_t ret = SDPort->SDPort_WriteFile(filepath, buf, req->content_len);
     free(buf);
@@ -281,6 +290,8 @@ extern "C" void photo_web_server_init(void)
         register_post("/api/wifi/connect", api_wifi_connect);
         register_post("/api/wifi/reset", api_wifi_reset);
         register_post("/api/upload", api_upload);
+        httpd_uri_t opt_up = {.uri = "/api/upload", .method = HTTP_OPTIONS, .handler = cors_options};
+        httpd_register_uri_handler(server, &opt_up);
         register_post("/api/delete", api_delete);
         register_get("/api/adjustments", api_adjustments_get);
         register_post("/api/adjustments", api_adjustments_post);
