@@ -362,8 +362,8 @@ img.src=URL.createObjectURL(new Blob([processedBmp],{type:'image/bmp'}))}
 function uploadPhoto(){
 if(!processedBmp||!fileFlag){alert('请先选择图片');return}
 var p=$('upload-progress');p.style.display='block';
-var x=new XMLHttpRequest();x.open('POST','/api/upload');
-x.setRequestHeader('X-Filename','phone_photo.bmp');
+var a=getAdj();var q='?name='+encodeURIComponent(a.dither+'_br'+a.br+'_ct'+a.ct+'_st'+a.st+'_sh'+a.sh+'_df'+a.df);
+var x=new XMLHttpRequest();x.open('POST','/api/upload'+q);
 x.upload.onprogress=function(e){p.firstChild.style.width=(e.loaded/e.total*100)+'%'};
 x.onload=function(){p.style.display='none';setMsg('upload-msg',x.status==200?'已显示到屏幕！':'上传失败',x.status==200);
 if(x.status==200){updateStatus();refreshPhotos()}};
