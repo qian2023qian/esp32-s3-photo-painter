@@ -30,7 +30,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#c9d
 .val-blue{color:#58a6ff}
 .val-red{color:#f85149}
 .compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
-.compare img{width:100%;border-radius:6px;border:1px solid var(--border)}
+.compare img{width:100%;max-height:340px;object-fit:contain;border-radius:6px;border:1px solid var(--border)}
 .compare .label{font-size:11px;color:var(--muted);text-align:center;margin-top:2px}
 .info-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:clamp(12px,1.3vw,14px);border-bottom:1px solid var(--border)}
 .info-row:last-child{border-bottom:none}
@@ -38,6 +38,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#c9d
 .btn-row{display:flex;gap:6px;flex-wrap:wrap}
 input{width:100%;padding:8px 10px;border-radius:6px;border:1px solid #30363d;background:var(--bg);color:#c9d1d9;font-size:clamp(12px,1.3vw,14px);margin-bottom:6px;outline:none}
 input:focus{border-color:#58a6ff}
+input[type=time]{padding:4px 8px;width:auto;margin:0}
 .btn{padding:clamp(6px,1vw,10px) clamp(10px,1.5vw,18px);border:none;border-radius:6px;cursor:pointer;font-size:clamp(12px,1.3vw,14px);font-weight:600;white-space:nowrap}
 .btn-blue{background:#1f6feb;color:#fff}.btn-blue:hover{background:#388bfd}
 .btn-red{background:#da3633;color:#fff}.btn-red:hover{background:#f85149}
@@ -141,6 +142,8 @@ details summary{font-size:clamp(12px,1.5vw,15px);color:var(--muted);cursor:point
 <h2>设置</h2>
 <div class="info-row"><span class="key">轮播间隔 (分钟)</span><input id="set-interval" type="number" min="1" max="1440" style="width:120px;margin:0"></div>
 <div class="toggle-row"><span class="key">自动轮播</span><span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span></div>
+<div class="info-row"><span class="key">休眠开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
+<div class="info-row"><span class="key">休眠结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
 <button class="btn btn-green" onclick="window.saveSettings()">保存设置</button>
 </div>
 <div class="card">
@@ -202,10 +205,10 @@ function resetWifi(){if(!confirm('确定重置WiFi？'))return;
 api('POST','/api/wifi/reset').then(function(){setMsg('wifi-msg','已重置，AP已重启',1);$('wifi-details').open=true})}
 
 function saveSettings(){
-api('POST','/api/settings',{interval:parseInt($('set-interval').value)||60,running:$('set-running').classList.contains('on')}).then(function(d){setMsg('wifi-msg','已保存',1)})}
+api('POST','/api/settings',{interval:parseInt($('set-interval').value)||60,running:$('set-running').classList.contains('on'),sleep_start:$('set-sleep-start').value,sleep_end:$('set-sleep-end').value}).then(function(d){setMsg('wifi-msg','已保存',1)})}
 function updateToggle(on){let t=$('set-running');if(on){t.classList.add('on')}else{t.classList.remove('on')}}
 function toggleRunning(){$('set-running').classList.toggle('on')}
-function loadSettings(){api('GET','/api/status').then(function(d){$('set-interval').value=d.interval;updateToggle(d.running)})}
+function loadSettings(){api('GET','/api/status').then(function(d){$('set-interval').value=d.interval;updateToggle(d.running);if(d.sleep_start)$('set-sleep-start').value=d.sleep_start;if(d.sleep_end)$('set-sleep-end').value=d.sleep_end})}
 function rebootDevice(){if(confirm('重启设备？'))api('POST','/api/reboot').then(function(){setMsg('wifi-msg','重启中...',1)})}
 
 function getAdj(){return{

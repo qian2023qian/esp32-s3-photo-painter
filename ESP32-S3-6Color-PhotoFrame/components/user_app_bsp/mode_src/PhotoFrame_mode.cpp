@@ -3,6 +3,8 @@
 #include <cJSON.h>
 #include <esp_log.h>
 #include <esp_sleep.h>
+#include <esp_sntp.h>
+#include <time.h>
 #include <sys/stat.h>
 
 #include "display_bsp.h"
@@ -22,6 +24,8 @@ uint32_t photo_img_count = 0;
 uint32_t photo_img_index = 0;
 int      photo_interval  = 60;  // minutes
 bool     photo_running   = true;
+char     sleep_start[6]  = "23:00";
+char     sleep_end[6]    = "07:00";
 
 static list_t *photoframe_list = NULL;
 static Shtc3Port *shtc3 = NULL;
@@ -62,6 +66,20 @@ static void gui_task(void *arg)
     }
 }
 
+/* ---- Sleep window check ---- */
+static bool is_sleep_time(void)
+{
+    time_t now; struct tm ti;
+    time(&now); localtime_r(&now, &ti);
+    int cur = ti.tm_hour * 60 + ti.tm_min;
+    int start = ((sleep_start[0]-'0')*10 + (sleep_start[1]-'0')) * 60
+              + ((sleep_start[3]-'0')*10 + (sleep_start[4]-'0'));
+    int end   = ((sleep_end[0]-'0')*10 + (sleep_end[1]-'0')) * 60
+              + ((sleep_end[3]-'0')*10 + (sleep_end[4]-'0'));
+    if (start <= end) return (cur >= start && cur < end);        // 同日 23:00~07:00
+    else              return (cur >= start || cur < end);         // 跨日
+}
+
 /* ---- Slideshow Task ---- */
 static void slideshow_task(void *arg)
 {
@@ -69,6 +87,7 @@ static void slideshow_task(void *arg)
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(photo_interval * 60 * 1000));
         if (!photo_running || photo_img_count == 0) continue;
+        if (is_sleep_time()) { ESP_LOGI(TAG, "休眠时段, 跳过轮播"); continue; }
         photo_img_index = (photo_img_index + 1) % photo_img_count;
         xEventGroupSetBits(epaper_groups, set_bit_button(0));
     }
@@ -108,6 +127,10 @@ void User_PhotoFrame_mode_app_init(void)
             if (item && cJSON_IsNumber(item)) photo_interval = item->valueint;
             item = cJSON_GetObjectItem(json, "running");
             if (item) photo_running = cJSON_IsTrue(item);
+            item = cJSON_GetObjectItem(json, "sleep_start");
+            if (item && cJSON_IsString(item)) strncpy(sleep_start, item->valuestring, 5);
+            item = cJSON_GetObjectItem(json, "sleep_end");
+            if (item && cJSON_IsString(item)) strncpy(sleep_end, item->valuestring, 5);
             cJSON_Delete(json);
         }
     }
@@ -125,6 +148,11 @@ void User_PhotoFrame_mode_app_init(void)
     if (!wifi_manager_connect()) {
         wifi_manager_start_ap();
     }
+
+    // SNTP time sync (non-blocking)
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "pool.ntp.org");
+    esp_sntp_init();
 
     // Start web server
     photo_web_server_init();

@@ -26,6 +26,8 @@ extern uint32_t photo_img_count;
 extern uint32_t photo_img_index;
 extern int      photo_interval;
 extern bool     photo_running;
+extern char     sleep_start[6];
+extern char     sleep_end[6];
 extern "C" bool photo_get_sensor(float *temp, float *rh);
 extern CustomSDPort *SDPort;
 extern ePaperPort ePaperDisplay;
@@ -48,6 +50,8 @@ static esp_err_t api_get_status(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "img_index", photo_img_index);
     cJSON_AddNumberToObject(root, "interval", photo_interval);
     cJSON_AddBoolToObject(root, "running", photo_running);
+    cJSON_AddStringToObject(root, "sleep_start", sleep_start);
+    cJSON_AddStringToObject(root, "sleep_end", sleep_end);
     char *str = cJSON_PrintUnformatted(root);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, str, HTTPD_RESP_USE_STRLEN);
