@@ -12,7 +12,8 @@ static const char *WEB_INDEX_HTML = R"====(
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0d1117;--card:#161b22;--cell:#0d1117;--border:#21262d;--muted:#8b949e}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#c9d1d9;margin:0 auto;padding:12px;width:100%}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#c9d1d9;margin:0 auto;padding:12px;width:100%;display:flex;justify-content:center}
+.dash{width:100%}
 .dash{display:grid;gap:10px}
 .topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--card);border-radius:10px}
 .topbar h1{font-size:clamp(14px,2.5vw,20px);font-weight:600}
@@ -78,7 +79,7 @@ details{margin-bottom:4px}
 #upload-progress{display:none;height:4px;background:#30363d;border-radius:2px;margin:6px 0}
 #upload-progress div{height:100%;background:#238636;border-radius:2px;width:0}
 @media(min-width:768px){body{padding:16px}.dash{max-width:640px}.compare img{height:340px}}
-@media(min-width:1024px){body{padding:20px}.dash{max-width:900px}.compare img{height:400px}}
+@media(min-width:1024px){body{padding:20px}.dash{max-width:1100px}.compare img{height:400px}}
 </style>
 </head>
 <body>
@@ -93,33 +94,6 @@ details{margin-bottom:4px}
 <div class="cell"><div class="lbl">温度</div><div class="val val-red" id="s-temp">--</div><div class="unit">℃</div></div>
 <div class="cell"><div class="lbl">湿度</div><div class="val val-blue" id="s-rh">--</div><div class="unit">%</div></div>
 </div>
-</div>
-
-<div class="card">
-<h2>设置</h2>
-
-<details id="wifi-details" style="margin-bottom:8px">
-<summary>WiFi 配网</summary>
-<p style="margin:6px 0;font-size:13px">AP: <b>PhotoFrame</b> / 密码: <b>12345678</b></p>
-<button class="btn btn-blue" onclick="window.scanWifi()" style="margin-bottom:8px">扫描网络</button>
-<div id="ssid-list"></div>
-<input id="wifi-ssid" placeholder="SSID">
-<input id="wifi-pass" type="password" placeholder="密码">
-<button class="btn btn-blue" onclick="window.connectWifi()">连接</button>
-<p class="msg" id="wifi-msg"></p>
-<button class="btn btn-red" onclick="window.resetWifi()" style="margin-top:6px">重置 WiFi</button>
-</details>
-
-<details style="margin-bottom:8px" open>
-<summary>相框设置</summary>
-<div class="info-row"><span class="key">轮播间隔 (分钟)</span><input id="set-interval" type="number" min="1" max="1440" style="width:120px;margin:0"></div>
-<div class="toggle-row"><span class="key">自动轮播</span><span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span></div>
-<div class="info-row"><span class="key">休眠开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
-<div class="info-row"><span class="key">休眠结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
-<button class="btn btn-green" onclick="window.saveSettings()" style="margin-top:6px">保存设置</button>
-</details>
-
-<button class="btn btn-red" onclick="window.rebootDevice()">重启设备</button>
 </div>
 
 <div class="card">
@@ -157,6 +131,34 @@ details{margin-bottom:4px}
 <div id="upload-progress"><div></div></div>
 <p class="msg" id="upload-msg"></p>
 </div>
+<div class="card">
+<h2>设置</h2>
+
+<details id="wifi-details" style="margin-bottom:8px">
+<summary>WiFi 配网</summary>
+<p style="margin:6px 0;font-size:13px">AP: <b>PhotoFrame</b> / 密码: <b>12345678</b></p>
+<button class="btn btn-blue" onclick="window.scanWifi()" style="margin-bottom:8px">扫描网络</button>
+<div id="ssid-list"></div>
+<input id="wifi-ssid" placeholder="SSID">
+<input id="wifi-pass" type="password" placeholder="密码">
+<button class="btn btn-blue" onclick="window.connectWifi()">连接</button>
+<p class="msg" id="wifi-msg"></p>
+<button class="btn btn-red" onclick="window.resetWifi()" style="margin-top:6px">重置 WiFi</button>
+</details>
+
+<details style="margin-bottom:8px" open>
+<summary>相框设置</summary>
+<div class="info-row"><span class="key">轮播间隔 (分钟)</span><input id="set-interval" type="number" min="1" max="1440" style="width:120px;margin:0"></div>
+<div class="toggle-row"><span class="key">自动轮播</span><span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span></div>
+<div class="info-row"><span class="key">休眠开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
+<div class="info-row"><span class="key">休眠结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
+<button class="btn btn-green" onclick="window.saveSettings()" style="margin-top:6px">保存设置</button>
+</details>
+
+<button class="btn btn-red" onclick="window.rebootDevice()">重启设备</button>
+</div>
+
+
 <div class="card">
 <h2>图片列表 (<span id="photo-count">0</span>)</h2>
 <div class="photo-grid" id="photo-list"><p style="color:var(--muted);font-size:12px">加载中...</p></div>
@@ -198,11 +200,40 @@ if(a.dither)$('adj-dither').value=a.dither;
 if(a.df!==undefined)$('adj-df').value=a.df;
 updateAdjLabels();adjLoaded=true}}).catch(function(){})}
 
+var calMap={"#000000":"#1f2226","#FFFFFF":"#b9c7c9","#FFFF00":"#c1bb1e","#FF0000":"#62201e","#0000FF":"#233f8e","#00FF00":"#35563a"};
+function toCal(r,g,b){var h="#"+[r,g,b].map(function(v){return v.toString(16).padStart(2,"0")}).join("");return calMap[h.toUpperCase()]}
+var switchCooldown=0;
 function refreshPhotos(){
 api('GET','/api/photos').then(function(d){
-$('photo-count').textContent=d.total;let h='';(d.files||[]).forEach(function(f){
-h+='<div class="info-row"><span>'+f+'</span><button class="btn btn-red btn-sm" onclick="window.delPhoto(\''+f+'\')">x</button></div>'});
+$('photo-count').textContent=d.total;let h='';(d.files||[]).forEach(function(f,idx){
+h+='<div class="photo-item" onclick="window.switchPhoto('+idx+')"><img src="/api/photo?name='+encodeURIComponent(f)+'" onload="window.calibrateThumb(this)" loading="lazy"><span class="pname">'+f+'</span><button class="del" onclick="event.stopPropagation();window.delPhoto(\''+f+'\')">x</button></div>'});
 $('photo-list').innerHTML=h||'<p style="color:var(--muted);font-size:12px">暂无图片</p>'})}
+function calibrateThumb(img){
+var cv=document.createElement('canvas');cv.width=img.naturalWidth;cv.height=img.naturalHeight;
+var ctx=cv.getContext('2d');ctx.drawImage(img,0,0);
+var id=ctx.getImageData(0,0,cv.width,cv.height);
+for(var i=0;i<id.data.length;i+=4){
+var cc=toCal(id.data[i],id.data[i+1],id.data[i+2]);
+if(cc){var rr=parseInt(cc.slice(1,3),16),gg=parseInt(cc.slice(3,5),16),bb=parseInt(cc.slice(5,7),16);id.data[i]=rr;id.data[i+1]=gg;id.data[i+2]=bb}}
+ctx.putImageData(id,0,0);img.src=cv.toDataURL()}
+function switchPhoto(idx){
+var now=Date.now();
+if(now-switchCooldown<15000){setMsg('wifi-msg','请等待15秒后再切换',0);return}
+switchCooldown=now;
+api('POST','/api/switch',{index:idx}).then(function(r){
+if(r.ok){updateStatus()}else{setMsg('wifi-msg',r.msg||'切换失败',0);switchCooldown=0}}).catch(function(){switchCooldown=0})}
+var cv=document.createElement('canvas');cv.width=img.naturalWidth;cv.height=img.naturalHeight;
+var ctx=cv.getContext('2d');ctx.drawImage(img,0,0);
+var id=ctx.getImageData(0,0,cv.width,cv.height);
+for(var i=0;i<id.data.length;i+=4){
+var cc=toCal(id.data[i],id.data[i+1],id.data[i+2]);
+if(cc){var rr=parseInt(cc.slice(1,3),16),gg=parseInt(cc.slice(3,5),16),bb=parseInt(cc.slice(5,7),16);id.data[i]=rr;id.data[i+1]=gg;id.data[i+2]=bb}}
+ctx.putImageData(id,0,0);img.src=cv.toDataURL()}
+var now=Date.now();
+if(now-switchCooldown<15000){setMsg('wifi-msg','请等待15秒后再切换',0);return}
+switchCooldown=now;
+api('POST','/api/switch',{index:idx}).then(function(r){
+if(r.ok){updateStatus()}else{setMsg('wifi-msg',r.msg||'切换失败',0);switchCooldown=0}}).catch(function(){switchCooldown=0})}
 function delPhoto(n){if(!confirm('删除 '+n+'?'))return;api('POST','/api/delete',{name:n}).then(function(){refreshPhotos();updateStatus()})}
 
 function scanWifi(){
