@@ -222,18 +222,6 @@ if(now-switchCooldown<15000){setMsg('wifi-msg','请等待15秒后再切换',0);r
 switchCooldown=now;
 api('POST','/api/switch',{index:idx}).then(function(r){
 if(r.ok){updateStatus()}else{setMsg('wifi-msg',r.msg||'切换失败',0);switchCooldown=0}}).catch(function(){switchCooldown=0})}
-var cv=document.createElement('canvas');cv.width=img.naturalWidth;cv.height=img.naturalHeight;
-var ctx=cv.getContext('2d');ctx.drawImage(img,0,0);
-var id=ctx.getImageData(0,0,cv.width,cv.height);
-for(var i=0;i<id.data.length;i+=4){
-var cc=toCal(id.data[i],id.data[i+1],id.data[i+2]);
-if(cc){var rr=parseInt(cc.slice(1,3),16),gg=parseInt(cc.slice(3,5),16),bb=parseInt(cc.slice(5,7),16);id.data[i]=rr;id.data[i+1]=gg;id.data[i+2]=bb}}
-ctx.putImageData(id,0,0);img.src=cv.toDataURL()}
-var now=Date.now();
-if(now-switchCooldown<15000){setMsg('wifi-msg','请等待15秒后再切换',0);return}
-switchCooldown=now;
-api('POST','/api/switch',{index:idx}).then(function(r){
-if(r.ok){updateStatus()}else{setMsg('wifi-msg',r.msg||'切换失败',0);switchCooldown=0}}).catch(function(){switchCooldown=0})}
 function delPhoto(n){if(!confirm('删除 '+n+'?'))return;api('POST','/api/delete',{name:n}).then(function(){refreshPhotos();updateStatus()})}
 
 function scanWifi(){
