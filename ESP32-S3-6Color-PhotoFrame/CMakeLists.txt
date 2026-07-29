@@ -10,3 +10,15 @@ set(CMAKE_NINJA_FORCE_RESPONSE_FILE 1 CACHE BOOL "Force response files" FORCE)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(xiaozhi)
 
+# Auto-generate photo_web_pages.h from dashboard.html at build time
+# Edit dashboard.html directly — no more C++ raw-string pain
+set(DASHBOARD_HTML "${CMAKE_CURRENT_SOURCE_DIR}/components/user_app_bsp/mode_src/dashboard.html")
+set(WEB_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/components/user_app_bsp/mode_src/photo_web_pages.h")
+add_custom_target(gen_web_pages ALL
+    COMMAND "${PYTHON}" "${CMAKE_CURRENT_SOURCE_DIR}/components/user_app_bsp/mode_src/html_to_header.py"
+            "${DASHBOARD_HTML}" "${WEB_HEADER}"
+    DEPENDS "${DASHBOARD_HTML}"
+    COMMENT "Generating photo_web_pages.h from dashboard.html"
+    VERBATIM
+)
+

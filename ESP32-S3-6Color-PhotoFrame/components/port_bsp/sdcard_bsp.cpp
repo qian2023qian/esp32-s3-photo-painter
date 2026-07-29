@@ -201,7 +201,7 @@ void CustomSDPort::SDPort_ScanListDir(const char *path) {
             if (strstr(entry->d_name, ".bmp") || strstr(entry->d_name, ".jpg") || strstr(entry->d_name, ".png") \
                 || strstr(entry->d_name, ".BMP") || strstr(entry->d_name, ".JPG") || strstr(entry->d_name, ".PNG")) {
                 uint16_t       Namestrlen   = strlen(path) + strlen(entry->d_name) + 1 + 1; 
-                if (Namestrlen >= 80) {
+                if (Namestrlen >= 128) {
                     ESP_LOGE(TAG, "scan file fill _strlen:%d", Namestrlen);
                     continue;
                 }

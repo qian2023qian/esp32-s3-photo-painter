@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <esp_timer.h>
 
 static const char *TAG = "photoweb";
 static httpd_handle_t server = NULL;
@@ -153,20 +154,48 @@ static esp_err_t api_upload(httpd_req_t *req)
         total += ret;
     }
 
-    char filepath[256];
-    snprintf(filepath, sizeof(filepath), "/sdcard/photos/%d.bmp", (int)photo_img_count);
+    // Use ?name= if provided, otherwise auto-number
+    char filepath[256], qbuf[256], fname[128] = {0};
+    if (httpd_req_get_url_query_str(req, qbuf, sizeof(qbuf)) == ESP_OK) {
+        httpd_query_key_value(qbuf, "name", fname, sizeof(fname));
+    }
+    if (fname[0]) {
+        // Basic sanitize: strip path separators
+        for (char *p = fname; *p; p++) if (*p == '/' || *p == '\\') *p = '_';
+        snprintf(filepath, sizeof(filepath), "/sdcard/photos/%s.bmp", fname);
+    } else {
+        snprintf(filepath, sizeof(filepath), "/sdcard/photos/%d.bmp", (int)photo_img_count);
+    }
 
+    int64_t t0 = esp_timer_get_time();
     esp_err_t ret = SDPort->SDPort_WriteFile(filepath, buf, req->content_len);
+    ESP_LOGI(TAG, "SD write: %lld us", esp_timer_get_time() - t0);
     free(buf);
+    vTaskDelay(pdMS_TO_TICKS(50)); // Ensure SD write is flushed before scan
     if (ret != ESP_OK) { httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "SD write failed"); return ESP_FAIL; }
 
     // 重新扫描以更新列表（ScanListDir 会先清空再扫描）
+    int64_t t1 = esp_timer_get_time();
     SDPort->SDPort_ScanListDir("/sdcard/photos");
+    ESP_LOGI(TAG, "SD scan: %lld us", esp_timer_get_time() - t1);
     photo_img_count = SDPort->SDPort_GetScanListValue();
-    photo_img_index = (photo_img_count > 0) ? (photo_img_count - 1) : 0;
+    // Find actual index of newly uploaded file (readdir order is not creation order)
+    photo_img_index = 0;
+    list_t *host = SDPort->SDPort_GetListHost();
+    if (host && photo_img_count > 0) {
+        uint32_t idx = 0;
+        list_iterator_t *it = list_iterator_new(host, LIST_HEAD);
+        list_node_t *node = list_iterator_next(it);
+        while (node) {
+            CustomSDPortNode_t *sd = (CustomSDPortNode_t *)node->val;
+            if (strcmp(sd->sdcard_name, filepath) == 0) { photo_img_index = idx; break; }
+            idx++;
+            node = list_iterator_next(it);
+        }
+        list_iterator_destroy(it);
+    }
+    ESP_LOGI(TAG, "上传完成: file=%s, count=%lu, showing index=%lu", filepath, photo_img_count, photo_img_index);
     xEventGroupSetBits(epaper_groups, set_bit_button(0));
-
-    ESP_LOGI(TAG, "上传成功: %s (%d 字节)", filepath, (int)req->content_len);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
     return ESP_OK;
@@ -187,7 +216,9 @@ static esp_err_t api_delete(httpd_req_t *req)
     snprintf(path, sizeof(path), "/sdcard/photos/%s", name);
     unlink(path);
     // 重新扫描以更新列表（ScanListDir 会先清空再扫描）
+    int64_t t1 = esp_timer_get_time();
     SDPort->SDPort_ScanListDir("/sdcard/photos");
+    ESP_LOGI(TAG, "SD scan: %lld us", esp_timer_get_time() - t1);
     photo_img_count = SDPort->SDPort_GetScanListValue();
     if (photo_img_index >= photo_img_count && photo_img_count > 0)
         photo_img_index = photo_img_count - 1;
@@ -275,28 +306,105 @@ static esp_err_t api_photo_get(httpd_req_t *req)
     if (!fname[0]) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing name"); return ESP_FAIL; }
     char path[300];
     snprintf(path, sizeof(path), "/sdcard/photos/%s", fname);
-    // Read file
+
+    // Check for thumbnail request
+    char thumb_str[4] = {0};
+    bool want_thumb = false;
+    if (httpd_req_get_url_query_str(req, qbuf, sizeof(qbuf)) == ESP_OK) {
+        if (httpd_query_key_value(qbuf, "thumb", thumb_str, sizeof(thumb_str)) == ESP_OK) {
+            want_thumb = (thumb_str[0] == '1');
+        }
+    }
+
     FILE *fp = fopen(path, "rb");
     if (!fp) { httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File not found"); return ESP_FAIL; }
     fseek(fp, 0, SEEK_END); long sz = ftell(fp); fseek(fp, 0, SEEK_SET);
     if (sz <= 0 || sz > 2*1024*1024) { fclose(fp); httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Bad file"); return ESP_FAIL; }
+
     uint8_t *buf = (uint8_t *)heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
     if (!buf) { fclose(fp); httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM"); return ESP_FAIL; }
     fread(buf, 1, sz, fp); fclose(fp);
-    httpd_resp_set_type(req, "image/bmp");
-    httpd_resp_send(req, (const char *)buf, sz);
+
+    if (!want_thumb) {
+        httpd_resp_set_type(req, "image/bmp");
+        httpd_resp_send(req, (const char *)buf, sz);
+        free(buf);
+        return ESP_OK;
+    }
+
+    // Generate thumbnail: subsample to max 200px wide
+    if (sz < 54) { free(buf); httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Bad BMP"); return ESP_FAIL; }
+    int orig_w = *(int32_t*)(buf + 18);
+    int orig_h = *(int32_t*)(buf + 22);
+    int bpp    = *(uint16_t*)(buf + 28);
+    if (orig_w <= 0 || orig_h <= 0 || orig_h > 5000) orig_h = abs(orig_h);
+    if (bpp != 24 || orig_w <= 0 || orig_h <= 0) {
+        // Unsupported format, send original
+        httpd_resp_set_type(req, "image/bmp");
+        httpd_resp_send(req, (const char *)buf, sz);
+        free(buf);
+        return ESP_OK;
+    }
+
+    int tw = 400;
+    if (orig_w <= tw) tw = orig_w;
+    int th = (orig_h * tw) / orig_w;
+    if (th < 1) th = 1;
+    int row_sz = (tw * 3 + 3) & ~3;  // 4-byte aligned
+    int pad_sz = row_sz * th;
+    int thumb_sz = 54 + pad_sz;
+
+    uint8_t *out = (uint8_t *)heap_caps_malloc(thumb_sz, MALLOC_CAP_SPIRAM);
+    if (!out) {
+        httpd_resp_set_type(req, "image/bmp");
+        httpd_resp_send(req, (const char *)buf, sz);
+        free(buf);
+        return ESP_OK;
+    }
+
+    // BMP header
+    memcpy(out, buf, 54);
+    *(int32_t*)(out + 2)  = thumb_sz;   // file size
+    *(int32_t*)(out + 18) = tw;         // width
+    *(int32_t*)(out + 22) = th;         // height
+    *(int32_t*)(out + 34) = pad_sz;     // image size
+
+    // Subsample: nearest-neighbor
+    int src_row_sz = (orig_w * 3 + 3) & ~3;
+    uint32_t data_off = *(uint32_t*)(buf + 10);
+    uint8_t *src = buf + data_off;
+    uint8_t *dst = out + 54;
+
+    for (int y = 0; y < th; y++) {
+        int sy = (y * orig_h) / th;
+        uint8_t *src_row = src + (orig_h - 1 - sy) * src_row_sz;  // BMP is bottom-up
+        uint8_t *dst_row = dst + (th - 1 - y) * row_sz;
+        for (int x = 0; x < tw; x++) {
+            int sx = (x * orig_w) / tw;
+            dst_row[x*3]   = src_row[sx*3];
+            dst_row[x*3+1] = src_row[sx*3+1];
+            dst_row[x*3+2] = src_row[sx*3+2];
+        }
+        // Padding bytes are already zero from memset-like... not guaranteed.
+        // Zero the padding
+        for (int p = tw*3; p < row_sz; p++) dst_row[p] = 0;
+    }
+
     free(buf);
+    httpd_resp_set_type(req, "image/bmp");
+    httpd_resp_send(req, (const char *)out, thumb_sz);
+    free(out);
     return ESP_OK;
 }
 
 /* ---- POST /api/switch ---- */
-static time_t last_switch_time = 0;
+static int64_t last_switch_time = 0;
 extern uint32_t photo_img_index;
 extern EventGroupHandle_t epaper_groups;
 static esp_err_t api_switch_post(httpd_req_t *req)
 {
-    time_t now; time(&now);
-    if (now - last_switch_time < 15) {
+    int64_t now = esp_timer_get_time();
+    if (now - last_switch_time < 15000000) {
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"请等待15秒后再切换\"}");
         return ESP_OK;

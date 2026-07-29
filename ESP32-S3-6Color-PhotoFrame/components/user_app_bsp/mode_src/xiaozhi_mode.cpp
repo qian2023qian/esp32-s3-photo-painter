@@ -11,7 +11,7 @@
 #include "list.h"
 #include "i2c_equipment.h"
 
-static const char *TAG = "xiaozhi_mode";
+[[maybe_unused]] static const char *TAG = "xiaozhi_mode";
 WeatherPort WeaPort;
 WeatherData_t *WeatherData = NULL;
 static list_t *ListHost = NULL;
