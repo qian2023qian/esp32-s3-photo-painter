@@ -88,13 +88,14 @@ SD 卡中放入初始图片到 `/sdcard/photos/` 目录（800×480 BMP 格式，
 ## 仪表盘功能
 
 - 实时温湿度显示
-- 图片列表（分页浏览、缩略图预览、点击切换）
-- 上传新图片前实时预览墨水屏效果（校准色板/设备色）
-- 亮度/对比度/饱和度/锐化/抖动矩阵/扩散强度 可调
-- 双管线切换
+- 图片列表：分页浏览（页码最多 5 个 + `«»` 翻页箭头）、缩略图预览（400px 降采样，顺序加载）、点击切换（ESP32 端 15 秒冷却保护）
+- 翻页缓存：已访问页面存 `pageStore`，翻回瞬显，不重新加载
+- 上传图片：实时预览墨水屏效果（校准色板/设备色）、进度条
+- 图像调节：亮度/对比度/饱和度/锐化/抖动矩阵/扩散强度 可调
+- 双管线切换（epdoptimize / OpenDisplay）
+- 上传/删除不重建图片列表，保持当前页面缩略图不变
 - WiFi 配网（STA+AP 降级，AP: PhotoFrame / 12345678）
-- 休眠时段设置
-- 图片轮播间隔调节
+- 休眠时段设置 + 图片轮播间隔调节
 
 ## 上传文件名格式
 
@@ -111,6 +112,8 @@ SD 卡中放入初始图片到 `/sdcard/photos/` 目录（800×480 BMP 格式，
 
 - NVS 命名空间键为 `PhotPainterMode`（少一个 o，不要修正拼写）
 - SD 卡列表缓冲区 `sdcard_name[128]`，文件名含路径不超过 127 字符
+- **FAT32 目录顺序**：`readdir()` 返回顺序 ≠ 文件创建顺序。上传后按文件名遍历查找索引，不能假设新文件在列表末尾
+- **缩略图校准**：`calibrateThumb()` 末尾 `img.src = cv.toDataURL()` 会触发 `onload` 重新进入自身，必须加 `img.onload=null` 切断无限递归
 - 墨水屏刷新受 `epaper_gui_semapHandle` 信号量保护
-- 图片切换通过 `epaper_groups` EventGroup 位 0 触发
+- 图片切换通过 `epaper_groups` EventGroup 位 0 触发，冷却用 `esp_timer_get_time()`（微秒内部时钟，不依赖 NTP）
 - 预编译固件 `03 Firmware/ESP32-S3-PhotoPainter-Fac.bin`
