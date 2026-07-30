@@ -162,8 +162,8 @@ details{margin-bottom:4px}
 <summary>相框设置</summary>
 <div class="info-row"><span class="key">轮播间隔 (分钟)</span><input id="set-interval" type="number" min="1" max="1440" style="width:120px;margin:0"></div>
 <div class="toggle-row"><span class="key">自动轮播</span><span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span></div>
-<div class="info-row"><span class="key">休眠开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
-<div class="info-row"><span class="key">休眠结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
+<div class="info-row"><span class="key">停止轮播开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
+<div class="info-row"><span class="key">停止轮播结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
 <button class="btn btn-green" onclick="window.saveSettings()" style="margin-top:6px">保存设置</button>
 </details>
 
