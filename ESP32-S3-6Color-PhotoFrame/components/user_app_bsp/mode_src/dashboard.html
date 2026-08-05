@@ -458,7 +458,10 @@ currentImgW=tw;currentImgH=th;
 canvas.width=tw;canvas.height=th;
 var ctx=canvas.getContext('2d');
 ctx.fillStyle=PAPER_WHITE;ctx.fillRect(0,0,tw,th);
-if(m==='fit'){var s=Math.min(tw/img.naturalWidth,th/img.naturalHeight);var w=img.naturalWidth*s,h=img.naturalHeight*s;ctx.drawImage(img,(tw-w)/2,(th-h)/2,w,h)}
+// 偏差 = |原图宽高比 - 目标宽高比| / 目标宽高比; auto 下偏差>=阈值时等比留白, 避免过度变形
+var dev=Math.abs(img.naturalWidth/img.naturalHeight - tw/th)/(tw/th);
+if(m==='fit'||(m==='auto'&&dev>=SCALE_THRESHOLD)){
+var s=Math.min(tw/img.naturalWidth,th/img.naturalHeight);var w=img.naturalWidth*s,h=img.naturalHeight*s;ctx.drawImage(img,(tw-w)/2,(th-h)/2,w,h)}
 else{ctx.drawImage(img,0,0,tw,th)}
 }
 
