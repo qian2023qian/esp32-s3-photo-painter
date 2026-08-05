@@ -67,7 +67,7 @@ select{padding:6px 8px;border-radius:6px;border:1px solid #30363d;background:var
 .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;max-height:300px;overflow-y:auto;padding:4px 0}
 .photo-item{cursor:pointer;text-align:center;background:var(--cell);border-radius:6px;padding:4px;position:relative;transition:background .15s}
 .photo-item:hover{background:#1f2a3a}
-.photo-item img{width:100%;aspect-ratio:800/480;object-fit:cover;border-radius:3px;display:block}
+.photo-item img{width:100%;aspect-ratio:800/480;object-fit:contain;border-radius:3px;display:block;background:#1a1a2e}
 .photo-item .pname{font-size:9px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .photo-item .del{position:absolute;top:2px;right:2px;background:#da3633;color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:14px;cursor:pointer;display:none}
 .photo-item:hover .del{display:block}
@@ -119,8 +119,8 @@ details{margin-bottom:4px}
 <input type="file" id="file-input" accept="image/*" style="display:none" onchange="window.fileChanged()">
 </div>
 <div class="compare" id="preview-area" style="display:none">
-<div><img id="preview-orig" alt="原图"><div class="label">原图</div></div>
-<div><img id="preview-processed" alt="处理后"><div class="label">墨水屏效果（校准色板）</div></div>
+<div><img id="preview-orig" alt="原图"><div class="label" id="label-orig">原图</div></div>
+<div><img id="preview-processed" alt="处理后"><div class="label" id="label-proc">处理后</div></div>
 </div>
 <div id="img-adjust" style="display:none">
 <div class="info-row"><span class="key">亮度</span><input type="range" id="adj-br" min="-50" max="50" value="0" oninput="window.onAdjust()"><span class="adjust-val" id="val-br">0</span></div>
@@ -129,6 +129,8 @@ details{margin-bottom:4px}
 <div class="info-row"><span class="key">锐化</span><input type="range" id="adj-sh" min="0" max="100" value="50" oninput="window.onAdjust()"><span class="adjust-val" id="val-sh">50</span></div>
 <div class="info-row"><span class="key">管线</span><select id="adj-pipe" onchange="window.onPipeChange()"><option value="epdoptimize">epdoptimize</option><option value="opendisplay">OpenDisplay</option></select></div>
 <div class="info-row"><span class="key">抖动模式</span><select id="adj-dither" onchange="window.onAdjust()"><option value="floydSteinberg">Floyd-Steinberg</option><option value="atkinson">Atkinson</option><option value="jarvis">Jarvis-Judice-Ninke</option><option value="stucki">Stucki</option><option value="burkes">Burkes</option><option value="sierra3">Sierra-3</option><option value="sierra2">Sierra-2</option></select></div>
+<div class="info-row"><span class="key">缩放模式</span><select id="adj-scale" onchange="window.onScaleChange()"><option value="auto">自动</option><option value="fit">等比留白</option><option value="stretch">强制拉伸</option></select></div>
+<div class="info-row" id="row-dir"><span class="key">方向</span><select id="adj-dir" onchange="window.onScaleChange()"><option value="auto">自动</option><option value="landscape">横屏 800×480</option><option value="portrait">竖屏 480×800</option></select></div>
 <div class="info-row"><span class="key">扩散强度</span><input type="range" id="adj-df" min="0" max="200" value="100" oninput="window.onAdjust()"><span class="adjust-val" id="val-df">100</span></div>
 </div>
 <div class="btn-row" id="action-row" style="display:none">
@@ -167,6 +169,17 @@ details{margin-bottom:4px}
 <button class="btn btn-green" onclick="window.saveSettings()" style="margin-top:6px">保存设置</button>
 </details>
 
+<details id="mqtt-details" style="margin-bottom:8px">
+<summary>MQTT (Home Assistant)</summary>
+<div class="toggle-row"><span class="key">启用 MQTT</span><span class="toggle-sw" id="set-mqtt-enabled" onclick="window.toggleMqttEnabled()"></span></div>
+<div class="info-row"><span class="key">Broker 地址</span><input id="set-mqtt-host" placeholder="192.168.1.100" style="width:140px;margin:0"></div>
+<div class="info-row"><span class="key">端口</span><input id="set-mqtt-port" type="number" min="1" max="65535" value="1883" style="width:80px;margin:0"></div>
+<div class="info-row"><span class="key">用户名</span><input id="set-mqtt-user" placeholder="(可选)" style="width:120px;margin:0"></div>
+<div class="info-row"><span class="key">密码</span><input id="set-mqtt-pass" type="password" placeholder="(可选)" style="width:120px;margin:0"></div>
+<button class="btn btn-green" onclick="window.saveMqttSettings()" style="margin-top:6px">保存 MQTT 设置</button>
+<p class="msg" id="mqtt-msg"></p>
+</details>
+
 <button class="btn btn-red" onclick="window.rebootDevice()">重启设备</button>
 
 
@@ -179,7 +192,7 @@ let odModule=null;
 async function loadOD(){if(!odModule){odModule=await import('/lib/opendisplay.js')}return odModule}
 
 let $=function(id){return document.getElementById(id)};
-let rotateAngle=0, processedBmp=null, fileFlag=0, adjLoaded=false;
+let rotateAngle=0, processedBmp=null, fileFlag=0, adjLoaded=false,lastOrigImg=null;
 let sourceCanvas, calibratedCanvas, deviceCanvas;
 let currentImgW=800, currentImgH=480;
 
@@ -215,7 +228,7 @@ function refreshPhotos(){
 	$('photo-count').textContent=d.total;var oldPg=thumbPage;thumbFiles=d.files||[];thumbPage=Math.min(oldPg,Math.max(0,Math.ceil(thumbFiles.length/thumbPageSize)-1));
 	renderPage()})}
 function renderPage(fromCache){
-	thumbQueue=[];var total=Math.ceil(thumbFiles.length/thumbPageSize)||1;
+	thumbQueue=[];preloadPaused=1;preloadQueue=[];var total=Math.ceil(thumbFiles.length/thumbPageSize)||1;
 	var key=thumbPage+'_'+thumbFiles.length;
 	if(!fromCache){var c=pageStore[key];if(c){console.log('Cache HIT:',key);$('photo-list').innerHTML=c;loadThumbsSeq();return}else{console.log('Cache MISS:',key,'available:',Object.keys(pageStore))}}
 	var h='';for(var i=thumbPage*thumbPageSize;i<Math.min(thumbPage*thumbPageSize+thumbPageSize,thumbFiles.length);i++){
@@ -224,9 +237,10 @@ function renderPage(fromCache){
 	if(total>1)h+=buildPager(total,thumbPage);
 	$('photo-list').innerHTML=h||'<p style="color:var(--muted);font-size:12px">暂无图片</p>';
 	if(thumbFiles.length)loadThumbsSeq()}
+function pagerWindow(cur,total){var s=Math.max(0,Math.min(cur-2,total-5));return{s:s,e:Math.min(s+5,total)}}
 function buildPager(total,cur){var h='<div class="photo-pager">';
 if(total>5){h+='<span class="pager-arr'+(cur===0?' pager-dis':'')+'" onclick="'+(cur>0?'window.goPage('+(cur-1)+')':'')+'" title="上一页">&laquo;</span>';
-var s=Math.max(0,Math.min(cur-2,total-5));
+var w=pagerWindow(cur,total),s=w.s;
 for(var p=s;p<s+5&&p<total;p++){
 h+='<span class="pager-num'+(p===cur?' pager-on':'')+'" onclick="window.goPage('+p+')">'+(p+1)+'</span>'}
 h+='<span class="pager-arr'+(cur===total-1?' pager-dis':'')+'" onclick="'+(cur<total-1?'window.goPage('+(cur+1)+')':'')+'" title="下一页">&raquo;</span>'}
@@ -240,15 +254,29 @@ if(imgs.length>0){pageStore[key]=$('photo-list').innerHTML;console.log('Cache sa
 console.log('goPage:',thumbPage,'->',p,'stored:',Object.keys(pageStore));
 thumbPage=p;renderPage()}
 var thumbQueue=[],thumbPage=0,thumbFiles=[],thumbPaused=0,thumbCurr=null;
+var preloadQueue=[],preloadPaused=0;
 function stopThumbs(){
-thumbPaused=1;thumbQueue=[];
+thumbPaused=1;thumbQueue=[];preloadPaused=1;preloadQueue=[];
 if(thumbCurr){thumbCurr.onload=null;thumbCurr.onerror=null;thumbCurr.src='';thumbCurr=null}}
 function loadThumbsSeq(){
 if(thumbPaused)return;
 thumbQueue=Array.from(document.querySelectorAll('#photo-list img[data-src]'));
 loadNextThumb()}
+function preloadNearby(){
+preloadPaused=0;preloadQueue=[];
+var w=pagerWindow(thumbPage,Math.ceil(thumbFiles.length/thumbPageSize)||1);
+for(var p=w.s;p<w.e;p++){if(p===thumbPage)continue;
+for(var i=p*thumbPageSize;i<Math.min((p+1)*thumbPageSize,thumbFiles.length);i++){
+preloadQueue.push(thumbFiles[i])}}
+loadNextPreload()}
+function loadNextPreload(){
+if(preloadPaused||!preloadQueue.length)return;
+var img=new Image();var f=preloadQueue.shift();
+img.onload=function(){img.onload=null;loadNextPreload()};
+img.onerror=function(){loadNextPreload()};
+img.src='/api/photo?name='+encodeURIComponent(f)+'&thumb=1'}
 function loadNextThumb(){
-if(!thumbQueue.length||thumbPaused){thumbCurr=null;return}
+if(!thumbQueue.length||thumbPaused){thumbCurr=null;preloadNearby();return}
 var img=thumbQueue.shift();thumbCurr=img;
 img.onload=function(){img.onload=null;calibrateThumb(img);thumbCurr=null;loadNextThumb()};
 img.onerror=function(){if(!thumbPaused){thumbCurr=null;loadNextThumb()}};
@@ -283,7 +311,14 @@ function saveSettings(){
 api('POST','/api/settings',{interval:parseInt($('set-interval').value)||60,running:$('set-running').classList.contains('on'),sleep_start:$('set-sleep-start').value,sleep_end:$('set-sleep-end').value}).then(function(d){setMsg('wifi-msg','已保存',1)})}
 function updateToggle(on){let t=$('set-running');if(on){t.classList.add('on')}else{t.classList.remove('on')}}
 function toggleRunning(){$('set-running').classList.toggle('on')}
-function loadSettings(){api('GET','/api/status').then(function(d){$('set-interval').value=d.interval;updateToggle(d.running);if(d.sleep_start)$('set-sleep-start').value=d.sleep_start;if(d.sleep_end)$('set-sleep-end').value=d.sleep_end})}
+function loadSettings(){api('GET','/api/status').then(function(d){$('set-interval').value=d.interval;updateToggle(d.running);if(d.sleep_start)$('set-sleep-start').value=d.sleep_start;if(d.sleep_end)$('set-sleep-end').value=d.sleep_end;if(d.mqtt){updateMqttToggle(d.mqtt.enabled);$('set-mqtt-host').value=d.mqtt.host||'';$('set-mqtt-port').value=d.mqtt.port||1883;$('set-mqtt-user').value=d.mqtt.username||''}})}
+function toggleMqttEnabled(){var t=$('set-mqtt-enabled');t.classList.toggle('on')}
+function updateMqttToggle(on){var t=$('set-mqtt-enabled');if(on){t.classList.add('on')}else{t.classList.remove('on')}}
+function saveMqttSettings(){
+api('POST','/api/settings',{mqtt:{enabled:$('set-mqtt-enabled').classList.contains('on'),
+host:$('set-mqtt-host').value.trim(),port:parseInt($('set-mqtt-port').value)||1883,
+username:$('set-mqtt-user').value.trim(),password:$('set-mqtt-pass').value}})
+.then(function(){setMsg('mqtt-msg','已保存',1);loadSettings()}).catch(function(){setMsg('mqtt-msg','保存失败',0)})}
 function rebootDevice(){if(confirm('重启设备？'))api('POST','/api/reboot').then(function(){setMsg('wifi-msg','重启中...',1)})}
 
 function getAdj(){return{
@@ -365,15 +400,22 @@ let imgData=ppCtx.getImageData(0,0,tw,th);
 let mode=od.DitherMode[odDM[$('adj-dither').value]]||od.DitherMode.BURKES;
 let r=od.ditherImage({width:tw,height:th,data:imgData.data},od.ColorScheme.BWGBRY,{mode:mode,serpentine:true});
 let cal=document.getElementById('cb-cal'),dev=document.getElementById('cb-od');
-if(!cal){cal=document.createElement('canvas');cal.id='cb-cal';document.body.appendChild(cal)}
-if(!dev){dev=document.createElement('canvas');dev.id='cb-od';document.body.appendChild(dev)}
+if(!cal){cal=document.createElement('canvas');cal.id='cb-cal';cal.style.display='none';document.body.appendChild(cal)}
+if(!dev){dev=document.createElement('canvas');dev.id='cb-od';dev.style.display='none';document.body.appendChild(dev)}
 cal.width=tw;cal.height=th;dev.width=tw;dev.height=th;
 let ci=cal.getContext('2d').createImageData(tw,th);
-for(let i=0;i<r.indices.length;i++){let c=r.palette[r.indices[i]];ci.data[i*4]=c.r;ci.data[i*4+1]=c.g;ci.data[i*4+2]=c.b;ci.data[i*4+3]=255}
+// 预览用墨水屏校准色(模拟实际显示), 发送 BMP 用设备纯色 => 预览颜色=屏幕显示
+var pal=[[0,0,0],[255,255,255],[255,255,0],[255,0,0],null,[0,0,255],[0,255,0]];
+var calCol=[[31,34,38],[185,199,201],[193,187,30],[98,32,30],null,[35,63,142],[53,86,58]];
+for(let i=0;i<r.indices.length;i++){
+let c=r.palette[r.indices[i]];let idx=-1;
+for(let k=0;k<pal.length;k++){if(!pal[k])continue;if(c.r===pal[k][0]&&c.g===pal[k][1]&&c.b===pal[k][2]){idx=k;break}}
+let cc=(idx>=0&&calCol[idx])?calCol[idx]:[c.r,c.g,c.b];
+ci.data[i*4]=cc[0];ci.data[i*4+1]=cc[1];ci.data[i*4+2]=cc[2];ci.data[i*4+3]=255}
 cal.getContext('2d').putImageData(ci,0,0);
 let di=dev.getContext('2d').createImageData(tw,th);
-let devMap={0:[0,0,0],1:[255,255,255],2:[0,255,0],3:[0,0,255],4:[255,0,0],5:[255,255,0]};
-for(let i=0;i<r.indices.length;i++){let dc=devMap[r.indices[i]]||devMap[1];di.data[i*4]=dc[0];di.data[i*4+1]=dc[1];di.data[i*4+2]=dc[2];di.data[i*4+3]=255}
+// OpenDisplay BWGBRY palette is already black/white/yellow/red/blue/green device colors
+for(let i=0;i<r.indices.length;i++){let dc=r.palette[r.indices[i]];di.data[i*4]=dc.r;di.data[i*4+1]=dc.g;di.data[i*4+2]=dc.b;di.data[i*4+3]=255}
 dev.getContext('2d').putImageData(di,0,0);
 $('preview-processed').src=cal.toDataURL();
 processedBmp=buildBmp(dev, tw, th);
@@ -392,28 +434,45 @@ $('preview-processed').src=calibratedCanvas.toDataURL();
 processedBmp=buildBmp(deviceCanvas, tw, th);
 }
 
+var PAPER_WHITE='#ffffff',SCALE_THRESHOLD=0.25;
+function onScaleChange(){
+var m=$('adj-scale').value;$('row-dir').style.display=(m==='stretch'?'none':'');
+if(fileFlag&&lastOrigImg){reprocess()}}
+async function reprocess(){
+if(!sourceCanvas){sourceCanvas=document.createElement('canvas')}
+applyScale(lastOrigImg,sourceCanvas);$('label-orig').textContent='原图 ('+lastOrigImg.naturalWidth+'×'+lastOrigImg.naturalHeight+')';
+var _m=$('adj-scale').value,_dir=(currentImgW>currentImgH)?'横屏':'竖屏',_mode=(_m==='fit')?'等比留白':'拉伸';
+var _r=lastOrigImg.naturalWidth/lastOrigImg.naturalHeight,_tr=currentImgW/currentImgH;
+$('label-proc').textContent='目标 '+currentImgW+'×'+currentImgH+' | 偏差 '+(Math.abs(_r-_tr)/_tr*100).toFixed(1)+'% | '+_mode+' | '+_dir;
+await runPipeline(sourceCanvas, currentImgW, currentImgH);
+		$('upload-msg').textContent='已就绪';fileFlag=1}
 function fileChanged(){
 let f=$('file-input').files[0];if(!f)return;
 if(!f.type.startsWith('image/')){alert('请选择图片文件');return}
 $('preview-area').style.display='grid';$('img-adjust').style.display='block';$('action-row').style.display='flex';
 $('upload-msg').textContent='处理中...';rotateAngle=0;
 let img=new Image();img.onload=async function(){
-let tw=800,th=480;if(img.naturalWidth<img.naturalHeight){tw=480;th=800}
-currentImgW=tw;currentImgH=th;
-$('preview-orig').src=URL.createObjectURL(f);
-if(!sourceCanvas){sourceCanvas=document.createElement('canvas')}
-sourceCanvas.width=tw;sourceCanvas.height=th;
-let ctx=sourceCanvas.getContext('2d');ctx.drawImage(img,0,0,tw,th);
-await runPipeline(sourceCanvas, tw, th);
-$('upload-msg').textContent='就绪 ('+tw+'x'+th+' 校准色板)';fileFlag=1};
+lastOrigImg=img;$('preview-orig').src=img.src;
+await reprocess()};
 img.src=URL.createObjectURL(f);$('file-input').value=''}
+function applyScale(img,canvas){
+var m=$('adj-scale').value,d=$('adj-dir').value;
+var tw=800,th=480;
+if(d==='portrait'||(d==='auto'&&img.naturalHeight>img.naturalWidth)){tw=480;th=800}
+currentImgW=tw;currentImgH=th;
+canvas.width=tw;canvas.height=th;
+var ctx=canvas.getContext('2d');
+ctx.fillStyle=PAPER_WHITE;ctx.fillRect(0,0,tw,th);
+if(m==='fit'){var s=Math.min(tw/img.naturalWidth,th/img.naturalHeight);var w=img.naturalWidth*s,h=img.naturalHeight*s;ctx.drawImage(img,(tw-w)/2,(th-h)/2,w,h)}
+else{ctx.drawImage(img,0,0,tw,th)}
+}
 
 let adjustTimer=null;
 function onAdjust(){
 updateAdjLabels();
 if(adjustTimer)clearTimeout(adjustTimer);
 adjustTimer=setTimeout(async function(){
-if(fileFlag){await runPipeline(sourceCanvas, currentImgW, currentImgH)}
+if(fileFlag){await runPipeline(sourceCanvas, currentImgW, currentImgH);$('upload-msg').textContent='已就绪';fileFlag=1}
 saveAdjusted()},300)}
 
 function buildBmp(canvas,w,h){
@@ -432,18 +491,18 @@ while(ro%4){bmp[off+ro]=0;ro++}off+=rowSize}return bmp}
 function rotateImg(){
 if(!processedBmp||!fileFlag){alert('请先选择图片');return}
 rotateAngle=(rotateAngle+90)%360;$('upload-msg').textContent='已旋转 '+rotateAngle+'°';
-let img=new Image();img.onload=async function(){
+let img=new Image();img.onload=async function(){lastOrigImg=img;
 let srcW=img.naturalWidth,srcH=img.naturalHeight;
-let tw=800,th=480;if(srcW<srcH){tw=480;th=800}
-currentImgW=tw;currentImgH=th;
 let c=document.createElement('canvas'),ctx=c.getContext('2d');
 if(rotateAngle%180==0){c.width=srcW;c.height=srcH}else{c.width=srcH;c.height=srcW}
 ctx.save();ctx.translate(c.width/2,c.height/2);ctx.rotate(rotateAngle*Math.PI/180);
 ctx.drawImage(img,-srcW/2,-srcH/2);ctx.restore();
+// Create a temporary Image from the rotated canvas
+let rotImg=new Image();rotImg.onload=async function(){
 if(!sourceCanvas){sourceCanvas=document.createElement('canvas')}
-sourceCanvas.width=tw;sourceCanvas.height=th;
-let ctx2=sourceCanvas.getContext('2d');ctx2.drawImage(c,0,0,tw,th);
-await runPipeline(sourceCanvas, tw, th)};
+applyScale(rotImg,sourceCanvas);
+await runPipeline(sourceCanvas, currentImgW, currentImgH);$('upload-msg').textContent='已就绪';fileFlag=1};
+rotImg.src=c.toDataURL('image/png')};
 img.src=URL.createObjectURL(new Blob([processedBmp],{type:'image/bmp'}))}
 
 function uploadPhoto(){
@@ -475,9 +534,10 @@ window.rebootDevice=rebootDevice;
 window.getAdj=getAdj;window.updateAdjLabels=updateAdjLabels;
 window.saveAdjusted=saveAdjusted;window.loadAdjusted=loadAdjusted;
 window.fileChanged=fileChanged;window.onPipeChange=onPipeChange;window.onAdjust=onAdjust;
-window.rotateImg=rotateImg;window.uploadPhoto=uploadPhoto;window.stopThumbs=stopThumbs;
+window.onScaleChange=onScaleChange;window.reprocess=reprocess;window.applyScale=applyScale;window.rotateImg=rotateImg;window.uploadPhoto=uploadPhoto;window.stopThumbs=stopThumbs;
+window.toggleMqttEnabled=toggleMqttEnabled;window.saveMqttSettings=saveMqttSettings;
 
-setInterval(updateStatus,5000);loadSettings();loadAdjusted();updateStatus();refreshPhotos();
+setInterval(updateStatus,5000);loadSettings();loadAdjusted();onScaleChange();updateStatus();refreshPhotos();
 </script>
 </body>
 </html>

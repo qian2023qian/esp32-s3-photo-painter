@@ -3,6 +3,7 @@
 #include "opendisplay_bundle.h"
 #include "wifi_manager.h"
 #include "nvs_manager.h"
+#include "mqtt_ha.h"
 #include "display_bsp.h"
 #include "sdcard_bsp.h"
 #include "button_bsp.h"
@@ -54,6 +55,13 @@ static esp_err_t api_get_status(httpd_req_t *req)
     cJSON_AddBoolToObject(root, "running", photo_running);
     cJSON_AddStringToObject(root, "sleep_start", sleep_start);
     cJSON_AddStringToObject(root, "sleep_end", sleep_end);
+    cJSON *mq = cJSON_CreateObject();
+    cJSON_AddBoolToObject(mq, "enabled",   mqtt_ha_enabled());
+    cJSON_AddStringToObject(mq, "host",     mqtt_ha_host());
+    cJSON_AddNumberToObject(mq, "port",     mqtt_ha_port());
+    cJSON_AddStringToObject(mq, "username", mqtt_ha_username());
+    cJSON_AddBoolToObject(mq, "connected",  mqtt_ha_connected());
+    cJSON_AddItemToObject(root, "mqtt", mq);
     char *str = cJSON_PrintUnformatted(root);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, str, HTTPD_RESP_USE_STRLEN);
@@ -236,11 +244,29 @@ static esp_err_t api_settings_post(httpd_req_t *req)
     buf[len] = '\0';
     cJSON *json = cJSON_Parse(buf);
     if (!json) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad JSON"); return ESP_FAIL; }
+    bool has_settings = false;
     cJSON *item = cJSON_GetObjectItem(json, "interval");
-    if (item && cJSON_IsNumber(item)) photo_interval = item->valueint;
+    if (item && cJSON_IsNumber(item)) { photo_interval = item->valueint; has_settings = true; }
     item = cJSON_GetObjectItem(json, "running");
-    if (item) photo_running = cJSON_IsTrue(item);
-    nvs_manager_set_str("photoframe", "interval", buf);
+    if (item) { photo_running = cJSON_IsTrue(item); has_settings = true; }
+    item = cJSON_GetObjectItem(json, "sleep_start");
+    if (item && cJSON_IsString(item)) { strncpy(sleep_start, item->valuestring, sizeof(sleep_start)); has_settings = true; }
+    item = cJSON_GetObjectItem(json, "sleep_end");
+    if (item && cJSON_IsString(item)) { strncpy(sleep_end, item->valuestring, sizeof(sleep_end)); has_settings = true; }
+
+    item = cJSON_GetObjectItem(json, "mqtt");
+    if (item && cJSON_IsObject(item)) {
+        cJSON *mq = cJSON_DetachItemFromObject(json, "mqtt");
+        char *ms = cJSON_PrintUnformatted(mq);
+        if (ms) { nvs_manager_set_str("photoframe", "mqtt", ms); free(ms); }
+        cJSON_Delete(mq);
+        mqtt_ha_reconfigure();
+    }
+
+    if (has_settings) {
+        char *s = cJSON_PrintUnformatted(json);
+        if (s) { nvs_manager_set_str("photoframe", "interval", s); free(s); }
+    }
     cJSON_Delete(json);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, "{\"ok\":true}");
@@ -327,6 +353,7 @@ static esp_err_t api_photo_get(httpd_req_t *req)
 
     if (!want_thumb) {
         httpd_resp_set_type(req, "image/bmp");
+        httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=3600");
         httpd_resp_send(req, (const char *)buf, sz);
         free(buf);
         return ESP_OK;
@@ -392,37 +419,28 @@ static esp_err_t api_photo_get(httpd_req_t *req)
 
     free(buf);
     httpd_resp_set_type(req, "image/bmp");
+    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=3600");
     httpd_resp_send(req, (const char *)out, thumb_sz);
     free(out);
     return ESP_OK;
 }
 
 /* ---- POST /api/switch ---- */
-static int64_t last_switch_time = 0;
-extern uint32_t photo_img_index;
-extern EventGroupHandle_t epaper_groups;
+extern "C" int photo_switch_to(uint32_t index);
 static esp_err_t api_switch_post(httpd_req_t *req)
 {
-    int64_t now = esp_timer_get_time();
-    if (now - last_switch_time < 15000000) {
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"请等待15秒后再切换\"}");
-        return ESP_OK;
-    }
     char buf[64]; int len = httpd_req_recv(req, buf, sizeof(buf) - 1);
     if (len <= 0) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data"); return ESP_FAIL; }
     buf[len] = '\0';
     cJSON *json = cJSON_Parse(buf);
     if (!json) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad JSON"); return ESP_FAIL; }
     cJSON *item = cJSON_GetObjectItem(json, "index");
-    if (item && cJSON_IsNumber(item)) {
-        photo_img_index = item->valueint;
-        last_switch_time = now;
-        xEventGroupSetBits(epaper_groups, set_bit_button(0));
-    }
+    bool ok = false;
+    if (item && cJSON_IsNumber(item) && photo_switch_to((uint32_t)item->valueint)) ok = true;
     cJSON_Delete(json);
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"ok\":true}");
+    httpd_resp_sendstr(req, ok ? "{\"ok\":true}"
+                               : "{\"ok\":false,\"msg\":\"请等待15秒后再切换\"}");
     return ESP_OK;
 }
 

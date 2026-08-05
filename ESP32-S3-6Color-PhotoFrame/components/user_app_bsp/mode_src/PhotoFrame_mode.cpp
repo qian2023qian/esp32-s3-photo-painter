@@ -4,6 +4,7 @@
 #include <esp_log.h>
 #include <esp_sleep.h>
 #include <esp_sntp.h>
+#include <esp_timer.h>
 #include <time.h>
 #include <sys/stat.h>
 
@@ -16,6 +17,7 @@
 
 #include "wifi_manager.h"
 #include "nvs_manager.h"
+#include "mqtt_ha.h"
 
 static const char *TAG = "photoframe";
 
@@ -37,6 +39,47 @@ extern "C" bool photo_get_sensor(float *temp, float *rh)
 {
     if (!shtc3) return false;
     return shtc3->Shtc3_ReadTempHumi(temp, rh);
+}
+
+/* ---- Shared control helpers (web server + MQTT share the same 15s throttle) ---- */
+static portMUX_TYPE g_switch_mux = portMUX_INITIALIZER_UNLOCKED;
+static int64_t      g_last_switch_us = 0;
+
+extern "C" void photo_persist_settings(void);
+
+extern "C" int photo_switch_to(uint32_t index)
+{
+    int64_t now = esp_timer_get_time();
+    portENTER_CRITICAL(&g_switch_mux);
+    if (now - g_last_switch_us < 15000000) { portEXIT_CRITICAL(&g_switch_mux); return 0; }
+    g_last_switch_us = now;
+    portEXIT_CRITICAL(&g_switch_mux);
+    if (photo_img_count == 0) return 0;
+    if (index >= photo_img_count) index = photo_img_count - 1;
+    photo_img_index = index;
+    xEventGroupSetBits(epaper_groups, set_bit_button(0));
+    ESP_LOGI(TAG, "switch to [%lu/%lu]", photo_img_index + 1, photo_img_count);
+    return 1;
+}
+
+extern "C" void photo_set_interval(int minutes)
+{
+    photo_interval = minutes;
+    photo_persist_settings();
+}
+
+extern "C" void photo_set_running(bool run)
+{
+    photo_running = run;
+    photo_persist_settings();
+}
+
+extern "C" void photo_persist_settings(void)
+{
+    char buf[256];
+    snprintf(buf, sizeof(buf), "{\"interval\":%d,\"running\":%s,\"sleep_start\":\"%s\",\"sleep_end\":\"%s\"}",
+             photo_interval, photo_running ? "true" : "false", sleep_start, sleep_end);
+    nvs_manager_set_str("photoframe", "interval", buf);
 }
 
 /* ---- ePaper GUI Task ---- */
@@ -83,13 +126,18 @@ static bool is_sleep_time(void)
 /* ---- Slideshow Task ---- */
 static void slideshow_task(void *arg)
 {
-    // 开机不自动刷新——墨水屏掉电不丢图，保留上次关机画面
+    // 每分钟检查一次，避免长 vTaskDelay 导致休眠结束后无法及时恢复
+    int tick_minute = 0;
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(photo_interval * 60 * 1000));
-        if (!photo_running || photo_img_count == 0) continue;
-        if (is_sleep_time()) { ESP_LOGI(TAG, "休眠时段, 跳过轮播"); continue; }
-        photo_img_index = (photo_img_index + 1) % photo_img_count;
-        xEventGroupSetBits(epaper_groups, set_bit_button(0));
+        vTaskDelay(pdMS_TO_TICKS(60 * 1000));
+        if (!photo_running || photo_img_count == 0) { tick_minute = 0; continue; }
+        if (is_sleep_time()) { tick_minute = 0; continue; }
+        tick_minute++;
+        if (tick_minute >= photo_interval) {
+            tick_minute = 0;
+            photo_img_index = (photo_img_index + 1) % photo_img_count;
+            xEventGroupSetBits(epaper_groups, set_bit_button(0));
+        }
     }
 }
 
@@ -119,7 +167,7 @@ void User_PhotoFrame_mode_app_init(void)
 
     // Load settings from NVS (saved via web dashboard)
     nvs_manager_init();
-    char nvs_buf[64]; size_t nvs_len = sizeof(nvs_buf);
+    char nvs_buf[256]; size_t nvs_len = sizeof(nvs_buf);
     if (nvs_manager_get_str("photoframe", "interval", nvs_buf, &nvs_len) == ESP_OK) {
         cJSON *json = cJSON_Parse(nvs_buf);
         if (json) {
@@ -156,6 +204,9 @@ void User_PhotoFrame_mode_app_init(void)
 
     // Start web server
     photo_web_server_init();
+
+    // MQTT -> Home Assistant (enabled via dashboard config in NVS)
+    mqtt_ha_start();
 
     // Create tasks
     xTaskCreate(gui_task, "photoframe_gui", 6 * 1024, NULL, 2, NULL);

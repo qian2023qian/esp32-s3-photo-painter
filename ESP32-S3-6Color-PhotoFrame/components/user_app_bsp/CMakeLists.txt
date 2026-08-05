@@ -6,12 +6,16 @@ idf_component_register(
   "mode_src/wifi_manager.c"
   "mode_src/nvs_manager.c"
   "mode_src/photo_web_server.cpp"
+  "mode_src/mqtt_ha.cpp"
   "user_app.cpp"
   PRIV_REQUIRES
   driver
   nvs_flash
   esp_wifi
   esp_http_server
+  mqtt
+  esp_hw_support
+  esp_timer
   main
   app_bsp
   codec_board
