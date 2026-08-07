@@ -143,6 +143,53 @@ static esp_err_t api_wifi_reset(httpd_req_t *req) {
     return ESP_OK;
 }
 
+/* ---- AI 推送照片上限清理（文件名 ai_<epoch>...bmp，超限删时间戳最旧） ---- */
+#define AI_MAX_FILES 300
+
+static bool name_has_ai_prefix(const char *fullpath)
+{
+    const char *base = strrchr(fullpath, '/');
+    base = base ? base + 1 : fullpath;
+    return (strncmp(base, "ai_", 3) == 0);
+}
+
+static int64_t parse_ai_ts(const char *base)
+{
+    const char *p = strstr(base, "ai_");
+    p = p ? p + 3 : base;
+    while (*p && (*p < '0' || *p > '9')) p++;
+    return strtoll(p, NULL, 10);
+}
+
+static void ai_cleanup(int64_t max_count)
+{
+    list_t *host = SDPort->SDPort_GetListHost();
+    if (!host) return;
+    int64_t ai_cnt = 0, min_ts = INT64_MAX;
+    char oldest[256] = {0};
+    list_iterator_t *it = list_iterator_new(host, LIST_HEAD);
+    list_node_t *node = list_iterator_next(it);
+    while (node) {
+        CustomSDPortNode_t *sd = (CustomSDPortNode_t *)node->val;
+        if (name_has_ai_prefix(sd->sdcard_name)) {
+            ai_cnt++;
+            const char *base = strrchr(sd->sdcard_name, '/');
+            base = base ? base + 1 : sd->sdcard_name;
+            int64_t ts = parse_ai_ts(base);
+            if (ts < min_ts) { min_ts = ts; strlcpy(oldest, sd->sdcard_name, sizeof(oldest)); }
+        }
+        node = list_iterator_next(it);
+    }
+    list_iterator_destroy(it);
+    if (ai_cnt > max_count && oldest[0]) {
+        ESP_LOGI(TAG, "ai_ cleanup: %lld ai files > %lld, unlink oldest %s",
+                 (long long)ai_cnt, (long long)max_count, oldest);
+        unlink(oldest);
+        SDPort->SDPort_ScanListDir("/sdcard/photos");
+        photo_img_count = SDPort->SDPort_GetScanListValue();
+    }
+}
+
 /* ---- POST /api/upload ---- */
 static esp_err_t api_upload(httpd_req_t *req)
 {
@@ -187,6 +234,10 @@ static esp_err_t api_upload(httpd_req_t *req)
     SDPort->SDPort_ScanListDir("/sdcard/photos");
     ESP_LOGI(TAG, "SD scan: %lld us", esp_timer_get_time() - t1);
     photo_img_count = SDPort->SDPort_GetScanListValue();
+    // AI 推送照片超上限时清理最旧的（新文件时间戳最新，不会被删）
+    if (strncmp(fname, "ai_", 3) == 0) {
+        ai_cleanup(AI_MAX_FILES);
+    }
     // Find actual index of newly uploaded file (readdir order is not creation order)
     photo_img_index = 0;
     list_t *host = SDPort->SDPort_GetListHost();
