@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from flask import Flask, abort, send_file, Response, request, redirect
+from flask import Flask, abort, send_file, Response, request, redirect, render_template_string
 import mimetypes
 import sqlite3
 import json
@@ -949,948 +949,348 @@ def build_html(rows, page: int, page_size: int, total_count: int):
 
 
 def build_simulator_html(sim_rows, selected_img: str = ""):
-    # 空数据时不要做任何无意义的循环，避免前端 JS 大对象
+    """墨水屏渲染 + 调色 + 推送页（两套管线，替代原 InkTime 模拟器）。"""
     if not sim_rows:
         sim_rows = []
-    items = []
-
-    def _parse_tags(ptype_val) -> list[str]:
-        """把 DB 的 type 字段解析成 tag 数组。
-        兼容三种常见存储：
-        - JSON 数组：   ["人物","日常"]
-        - 伪数组文本：  [人物, 日常] / [人物，日常]
-        - 普通字符串：  人物,日常 / 人物
-        注意：这里是容错解析，目的是不让 /sim 因坏数据 500。
-        """
-        if ptype_val is None:
-            return []
-        s = str(ptype_val).strip()
-        if not s:
-            return []
-
-        # 1) 先尝试严格 JSON
-        if s.startswith("[") and s.endswith("]"):
-            try:
-                arr = json.loads(s)
-                if isinstance(arr, list):
-                    out = []
-                    for x in arr:
-                        t = str(x).strip()
-                        if t:
-                            out.append(t)
-                    return out
-            except Exception:
-                # JSON 不合法：继续走容错
-                pass
-
-        # 2) 容错：去掉最外层 [] 以及引号，然后按逗号/中文逗号切
-        if s.startswith("[") and s.endswith("]"):
-            s = s[1:-1].strip()
-
-        # 去掉可能出现的引号
-        s = s.replace('"', '').replace("'", "")
-
-        parts = [p.strip() for p in s.replace('，', ',').split(',')]
-        out = [p for p in parts if p]
-        return out
-    for (
-        path,
-        caption,
-        ptype,
-        memory_score,
-        beauty_score,
-        reason,
-        side_caption,
-        exif_json,
-        width,
-        height,
-        orientation,
-        used_at,
-        gps_lat,
-        gps_lon,
-        exif_city,
-    ) in sim_rows:
-        date_str = extract_date_from_exif(exif_json)  # 可能为空（无 EXIF 拍摄时间）
-        img_uri = _make_image_url(str(path))
-        if not img_uri:
+    info: dict = {}
+    for row in sim_rows:
+        try:
+            (path, caption, ptype, memory_score, beauty_score, reason,
+             side_caption, exif_json, width, height, orientation, used_at,
+             gps_lat, gps_lon, exif_city) = row[:15]
+        except Exception:
             continue
-
-        # tags: 保证为数组，优先解析 JSON/容错
-        type_value = _parse_tags(ptype)
-
-        items.append({
-            "path": img_uri,
-            "date": date_str,
+        img_uri = _make_image_url(str(path))
+        if not img_uri or img_uri != selected_img:
+            continue
+        info = {
+            "date": extract_date_from_exif(exif_json),
             "memory": float(memory_score) if memory_score is not None else None,
             "beauty": float(beauty_score) if beauty_score is not None else None,
-            "city": exif_city or "",
-            "lat": gps_lat,
-            "lon": gps_lon,
             "side": side_caption or "",
             "caption": caption or "",
-            "type": type_value,
+            "type": ptype or "",
             "reason": reason or "",
-            "exif_json": exif_json or "",
             "exif_summary": summarize_exif(exif_json) if exif_json else "",
             "width": width if width is not None else "",
             "height": height if height is not None else "",
             "orientation": orientation or "",
             "used_at": used_at or "",
-        })
-
-    data_json = json.dumps(items, ensure_ascii=False).replace("</", "<\\/") if items else "[]"
+            "lat": gps_lat,
+            "lon": gps_lon,
+            "city": exif_city or "",
+        }
+        break
+    info_json = json.dumps(info, ensure_ascii=False).replace("</", "<\\/")
     selected_json = json.dumps(selected_img or "", ensure_ascii=False).replace("</", "<\\/")
+    # 实时读 settings.json（settings_store 每次都读文件），避免 serve 进程内 config 模块缓存旧值
+    cur_settings = settings_store.load()
+    esp32_host = str(cur_settings.get("ESP32_HOST") or "192.168.4.1")
+    saved_adj = dict(cur_settings.get("RENDER_ADJ") or {})
+    render_adj_json = json.dumps(saved_adj, ensure_ascii=False).replace("</", "<\\/")
+    render_dither = str(cur_settings.get("RENDER_DITHER") or "floydSteinberg")
+    return render_template_string(
+        _SIM_TEMPLATE,
+        selected_json=selected_json, info_json=info_json, esp32_host=esp32_host,
+        render_adj_json=render_adj_json, render_dither=render_dither,
+    )
 
-    html_str = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <title>墨水屏渲染效果预览</title>
-  <style>
-    :root {{
-      --bg: #0b0c10;
-      --panel: rgba(255,255,255,0.06);
-      --line: rgba(255,255,255,0.14);
-      --text: rgba(255,255,255,0.92);
-      --muted: rgba(255,255,255,0.62);
-      --muted2: rgba(255,255,255,0.48);
-      --accent: #8ab4ff;
-      --accent2: #9cffd6;
-      --shadow: 0 18px 60px rgba(0,0,0,0.45);
-      --shadow2: 0 10px 28px rgba(0,0,0,0.35);
-      --radius: 14px;
-    }}
-    body {{
-      margin:0; padding:0;
-      font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
-      background: radial-gradient(1200px 800px at 20% 0%, rgba(138,180,255,0.18), transparent 45%),
-                  radial-gradient(900px 700px at 90% 20%, rgba(156,255,214,0.14), transparent 55%),
-                  linear-gradient(180deg, #07080b 0%, #0b0c10 40%, #0b0c10 100%);
-      color: var(--text);
-    }}
-    .container {{
-      max-width: 1120px;
-      margin: 22px auto 42px;
-      padding: 0 16px;
-    }}
-    a.back {{
-      display:inline-block;
-      margin-bottom: 10px;
-      color: var(--accent);
-      text-decoration: none;
-    }}
-    h1 {{
-      font-size: 22px;
-      margin: 0 0 8px;
-      letter-spacing: 0.2px;
-    }}
-    .subtitle {{
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 14px;
-      line-height: 1.45;
-    }}
-    .controls {{
-      display:flex;
-      align-items:center;
-      gap: 10px;
-      margin-bottom: 14px;
-      font-size: 13px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 10px 12px;
-      box-shadow: var(--shadow2);
-      backdrop-filter: blur(10px);
-    }}
-    .controls button {{
-      padding: 7px 12px;
-      font-size: 13px;
-      cursor: pointer;
-      color: var(--text);
-      background: rgba(255,255,255,0.10);
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 10px;
-      transition: transform .08s ease, background .15s ease, border-color .15s ease, opacity .15s ease;
-    }}
-    .controls button:hover {{
-      background: rgba(255,255,255,0.14);
-      border-color: rgba(255,255,255,0.26);
-    }}
-    .controls button:active {{
-      transform: translateY(1px);
-    }}
 
-    .status {{
-      font-size: 12px;
-      color: var(--muted);
-      margin: 6px 0 10px;
-      min-height: 16px;
-    }}
-
-    .preview-wrap {{
-      display:flex;
-      flex-wrap:wrap;
-      gap: 16px;
-      align-items: flex-start;
-    }}
-    .canvas-box {{
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 10px;
-      box-shadow: var(--shadow2);
-      backdrop-filter: blur(10px);
-    }}
-    .canvas-box h2 {{
-      font-size: 13px;
-      margin: 0 0 8px;
-      color: rgba(255,255,255,0.78);
-    }}
-    #previewCanvas {{
-      display:block;
-      background:#fff;
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 10px;
-    }}
-
-    .meta-box {{
-      flex: 1;
-      min-width: 320px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 12px;
-      box-shadow: var(--shadow2);
-      backdrop-filter: blur(10px);
-      font-size: 16px;
-      line-height: 1.75;
-    }}
-    .meta-title {{
-      font-size: 13px;
-      color: rgba(255,255,255,0.78);
-      margin: 0 0 10px;
-    }}
-    .kpi {{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid rgba(255,255,255,0.10);
-    }}
-    .kpi .cell {{
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.10);
-      border-radius: 12px;
-      padding: 10px;
-    }}
-    .kpi .label {{
-      font-size: 11px;
-      color: var(--muted2);
-      margin-bottom: 4px;
-    }}
-    .kpi .value {{
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text);
-      line-height: 1.2;
-      word-break: break-word;
-    }}
-    .kpi .value.accent {{
-      color: var(--accent2);
-    }}
-
-    .field {{
-      display:flex;
-      gap: 10px;
-      margin-bottom: 8px;
-      line-height: 1.45;
-      font-size: 12px;
-    }}
-    .field .label {{
-      width: 92px;
-      flex: 0 0 92px;
-      color: var(--muted2);
-    }}
-    .field .value {{
-      flex: 1;
-      color: var(--text);
-      word-break: break-word;
-    }}
-    .mono {{
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 11px;
-      color: rgba(255,255,255,0.80);
-      white-space: pre-wrap;
-      word-break: break-word;
-      background: rgba(0,0,0,0.22);
-      border: 1px solid rgba(255,255,255,0.10);
-      border-radius: 12px;
-      padding: 10px;
-    }}
-
-    .section {{
-      padding-top: 10px;
-      margin-top: 10px;
-      border-top: 1px solid rgba(255,255,255,0.10);
-    }}
-    .section:first-of-type {{
-      padding-top: 0;
-      margin-top: 0;
-      border-top: none;
-    }}
-    .section-title {{
-      display:flex;
-      align-items:center;
-      justify-content: space-between;
-      gap: 10px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.78);
-      margin: 0 0 8px;
-      letter-spacing: .2px;
-    }}
-
-    .chips {{
-      display:flex;
-      flex-wrap:wrap;
-      gap: 8px;
-      margin: 12px 0 14px;
-    }}
-    .chip {{
-      display:inline-flex;
-      align-items:center;
-      gap: 6px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      line-height: 1;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(255,255,255,0.07);
-      color: rgba(255,255,255,0.92);
-      user-select: none;
-    }}
-    .chip-dot {{
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.7);
-      flex: 0 0 8px;
-    }}
-
-    .big-text {{
-      font-size: 13px;
-      line-height: 1.55;
-      color: rgba(255,255,255,0.92);
-      padding: 10px 12px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.10);
-      border-radius: 12px;
-      word-break: break-word;
-      white-space: pre-wrap;
-    }}
-
-    details.fold {{
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.10);
-      border-radius: 12px;
-      padding: 10px 12px;
-      margin-top: 18px;
-      font-size: 14px;
-    }}
-    details.fold > summary {{
-      cursor: pointer;
-      list-style: none;
-      outline: none;
-      color: rgba(255,255,255,0.86);
-      font-size: 12px;
-      display:flex;
-      align-items:center;
-      justify-content: space-between;
-      gap: 10px;
-    }}
-    details.fold > summary::-webkit-details-marker {{ display: none; }}
-    .fold-hint {{
-      color: rgba(255,255,255,0.55);
-      font-size: 11px;
-    }}
-
-    .kv-grid {{
-      display:grid;
-      grid-template-columns: 92px 1fr;
-      gap: 8px 10px;
-      margin-top: 10px;
-      font-size: 12px;
-      line-height: 1.45;
-    }}
-    .kv-k {{
-      color: rgba(255,255,255,0.52);
-    }}
-    .kv-v {{
-      color: rgba(255,255,255,0.92);
-      word-break: break-word;
-    }}
-
-    .hero-text {{
-      font-size: 26px;
-      line-height: 1.7;
-      font-weight: 650;
-      margin-bottom: 18px;
-      color: rgba(255,255,255,0.98);
-      word-break: break-word;
-      white-space: pre-wrap;
-    }}
-
-    .sub-text {{
-      font-size: 17px;
-      line-height: 1.8;
-      color: rgba(255,255,255,0.90);
-      margin: 14px 0 18px;
-      word-break: break-word;
-      white-space: pre-wrap;
-    }}
-
-    .score-bars {{
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
-      margin: 18px 0 20px;
-    }}
-
-    .score-row {{
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 14px;
-      color: rgba(255,255,255,0.75);
-    }}
-
-    .score-track {{
-      position: relative;
-      flex: 1;
-      height: 10px;
-      background: rgba(255,255,255,0.12);
-      border-radius: 999px;
-      overflow: hidden;
-    }}
-
-    .score-fill {{
-      position: absolute;
-      left: 0; top: 0; bottom: 0;
-      width: 0%;
-      border-radius: 999px;
-    }}
-
-    .score-fill.memory {{ background: linear-gradient(90deg, #6fd6ff, #9cffd6); }}
-    .score-fill.beauty {{ background: linear-gradient(90deg, #ffd36f, #ff9f6f); }}
-
-    .score-num {{
-      width: 44px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      color: rgba(255,255,255,0.9);
-    }}
-
-    #fieldReason {{
-      font-size: 16px;
-      line-height: 1.8;
-      margin-top: 6px;
-    }}
-
-    @media (max-width: 560px) {{
-      .kpi {{ grid-template-columns: 1fr; }}
-      .meta-box {{ min-width: 0; }}
-    }}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <a class="back" href="/review">← 返回 Review</a>
-    <h1>墨水屏渲染效果预览</h1>
-    <div class="subtitle">
-      屏幕尺寸：480 x 800&nbsp;&nbsp;
-      <span style="display:inline-flex; gap:6px; vertical-align:middle;">
-        <span style="width:10px;height:10px;box-sizing:border-box;border-radius:50%;background:#000;border:1px solid rgba(255,255,255,0.70);"></span>
-        <span style="width:10px;height:10px;box-sizing:border-box;border-radius:50%;background:#fff;border:1px solid rgba(255,255,255,0.45);"></span>
-        <span style="width:10px;height:10px;box-sizing:border-box;border-radius:50%;background:#c80000;border:1px solid rgba(255,255,255,0.18);"></span>
-        <span style="width:10px;height:10px;box-sizing:border-box;border-radius:50%;background:#e0b400;border:1px solid rgba(255,255,255,0.18);"></span>
-      </span>
-    </div>
-
-    <div class="controls">
-      <button type="button" id="rerollBtn">同一天换一张</button>
-    </div>
-
-    <div class="status" id="statusLine"></div>
-
-    <div class="preview-wrap">
-      <div class="canvas-box">
-        <canvas id="previewCanvas" width="480" height="800"></canvas>
-      </div>
-
-      <div class="meta-box">
-        <div class="hero-text" id="kpiSide"></div>
-
-        <div class="chips" id="fieldType"></div>
-
-        <div class="sub-text" id="fieldCaption"></div>
-
-        <div class="score-bars">
-          <div class="score-row">
-            <div>回忆度</div>
-            <div class="score-track">
-              <div class="score-fill memory" id="barMemory"></div>
-            </div>
-            <div class="score-num" id="numMemory"></div>
-          </div>
-          <div class="score-row">
-            <div>美观度</div>
-            <div class="score-track">
-              <div class="score-fill beauty" id="barBeauty"></div>
-            </div>
-            <div class="score-num" id="numBeauty"></div>
-          </div>
-        </div>
-
-        <div class="sub-text" id="fieldReason"></div>
-
-        <details class="fold">
-          <summary>
-            <span>更多信息</span>
-            <span class="fold-hint">EXIF / 路径 / 调试</span>
-          </summary>
-
-          <div class="kv-grid">
-            <div class="kv-k">日期</div><div class="kv-v" id="kpiDate"></div>
-            <div class="kv-k">地点</div><div class="kv-v" id="kpiLocation"></div>
-            <div class="kv-k">图片URL</div><div class="kv-v" id="fieldPath"></div>
-            <div class="kv-k">原始路径</div><div class="kv-v" id="fieldOrigPath"></div>
-            <div class="kv-k">分辨率</div><div class="kv-v" id="fieldRes"></div>
-            <div class="kv-k">方向</div><div class="kv-v" id="fieldOrientation"></div>
-            <div class="kv-k">已上屏</div><div class="kv-v" id="fieldUsedAt"></div>
-            <div class="kv-k">EXIF摘要</div><div class="kv-v" id="fieldExifSummary"></div>
-          </div>
-
-          <details class="fold" style="margin-top:10px;">
-            <summary>
-              <span>EXIF JSON</span>
-              <span class="fold-hint">调试</span>
-            </summary>
-            <div class="mono" id="fieldExifJson"></div>
-          </details>
-        </details>
-      </div>
-    </div>
+_SIM_TEMPLATE = """<!doctype html>
+<html lang="zh"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>墨水屏渲染 · 调色 · 推送</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;padding:24px;max-width:1080px;margin:0 auto;font-size:18px;line-height:1.6}
+h1{font-size:25px;margin-bottom:8px;color:#e6edf3}
+.sub{font-size:14px;color:#8b949e;margin-bottom:18px}
+.nav{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.nav a{background:#161b22;border:1px solid #30363d;color:#c9d1d9;text-decoration:none;padding:10px 22px;border-radius:10px;font-size:14px;transition:background .2s}
+.nav a:hover{background:#1f2a3a}
+.info-bar{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px 18px;font-size:14px;margin-bottom:14px}
+.srow{display:flex;align-items:center;gap:12px;margin:7px 0;font-size:14px}
+.skey{color:#8b949e;min-width:48px;flex-shrink:0}
+.sbar{flex:1;height:14px;background:#21262d;border-radius:8px;overflow:hidden}
+.sbar-fill{height:100%;border-radius:8px}
+.sbar-fill.mem{background:linear-gradient(90deg,#6fd6ff,#9cffd6)}
+.sbar-fill.bea{background:linear-gradient(90deg,#ffd36f,#ff9f6f)}
+.sval{min-width:42px;text-align:right;color:#e6edf3}
+.sval2{flex:1;color:#c9d1d9;word-break:break-all}
+.bar{display:flex;gap:10px;align-items:center;padding:10px 14px;background:#161b22;border:1px solid #30363d;border-radius:10px;margin-bottom:14px}
+.bar input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:14px;outline:none}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.cmp .panel:first-child{grid-column:1/-1}
+.panel{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px}
+.panel h2{font-size:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;color:#e6edf3}
+.tag{font-size:10px;padding:2px 8px;border-radius:5px}.tag-e{background:#8250df;color:#fff}.tag-o{background:#da3633;color:#fff}.tag-n{background:#8b949e;color:#fff}
+.panel img{width:100%;max-height:480px;object-fit:contain;display:block;margin:0 auto;border-radius:10px;border:1px solid #21262d;background:#1a1a2e}
+.btn-send{width:100%;margin-top:10px;padding:12px 0;border:none;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600;color:#fff}
+.btn-send:hover{filter:brightness(1.1)}
+.msg{font-size:12px;margin-top:6px;text-align:center}.ok{color:#3fb950}.err{color:#f85149}
+.sliders{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+.slider-item{display:flex;align-items:center;gap:10px;font-size:14px}
+.slider-item .key{color:#8b949e;min-width:52px}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:24px;background:transparent;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:#30363d;border-radius:5px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;background:#58a6ff;border-radius:50%;margin-top:-9px;cursor:pointer;border:3px solid #0d1117}
+select{padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:14px}
+.slider-item .val{color:#8b949e;min-width:36px;text-align:right;font-size:14px}
+.save-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.btn-save{background:#238636;border:none;color:#fff;border-radius:10px;padding:10px 22px;cursor:pointer;font-size:14px}
+.btn-save:hover{filter:brightness(1.1)}
+.upload{border:2px dashed #30363d;border-radius:12px;padding:16px;text-align:center;cursor:pointer;font-size:14px;color:#8b949e;margin-bottom:14px}
+.upload:hover{border-color:#58a6ff;background:#0d1117}
+@media(max-width:800px){.cmp{grid-template-columns:1fr}}
+</style></head><body>
+<h1>墨水屏渲染 · 调色 · 推送</h1>
+<p class="sub">两套管线（epdoptimize / OpenDisplay）渲染 6 色，调色后推送到相框（ai_&lt;时间戳&gt;.bmp）</p>
+<div class="nav">
+  <a href="/review">📷 照片库</a>
+  <a href="/sim">🎨 渲染推送</a>
+  <a href="/settings">⚙️ 设置</a>
+</div>
+<div class="bar">
+  <span style="font-size:9px;color:#8b949e;white-space:nowrap">ESP32</span>
+  <input id="esp32-host" value="{{ esp32_host }}">
+</div>
+<div class="info-bar" id="infoBar">加载中…</div>
+<div class="cmp">
+  <div class="panel">
+    <h2><span>原图</span><span class="tag tag-n">原图</span></h2>
+    <img id="preview-orig" alt="原图">
   </div>
+  <div class="panel">
+    <h2><span>epdoptimize</span><span class="tag tag-e">校准色板</span></h2>
+    <canvas id="cb-src" style="display:none"></canvas>
+    <canvas id="cb-cal" style="display:none"></canvas>
+    <canvas id="cb-dev" style="display:none"></canvas>
+    <img id="preview-epd" alt="epd">
+    <button class="btn-send" style="background:#8250df" onclick="sendEpd()">推送到相框</button>
+    <p class="msg" id="msg-epd"></p>
+  </div>
+  <div class="panel">
+    <h2><span>OpenDisplay</span><span class="tag tag-o">纯色板</span></h2>
+    <canvas id="co-src" style="display:none"></canvas>
+    <canvas id="co-out" style="display:none"></canvas>
+    <img id="preview-od" alt="od">
+    <button class="btn-send" style="background:#da3633" onclick="sendOd()">推送到相框</button>
+    <p class="msg" id="msg-od"></p>
+  </div>
+</div>
+<div class="sliders">
+  <div class="slider-item"><span class="key">亮度</span><input type="range" id="adj-br" min="-50" max="50" value="0" oninput="onAdj()"><span class="val" id="val-br">0</span></div>
+  <div class="slider-item"><span class="key">对比度</span><input type="range" id="adj-ct" min="-50" max="50" value="20" oninput="onAdj()"><span class="val" id="val-ct">20</span></div>
+  <div class="slider-item"><span class="key">饱和度</span><input type="range" id="adj-st" min="-50" max="50" value="20" oninput="onAdj()"><span class="val" id="val-st">20</span></div>
+  <div class="slider-item"><span class="key">锐化</span><input type="range" id="adj-sh" min="0" max="100" value="50" oninput="onAdj()"><span class="val" id="val-sh">50</span></div>
+  <div class="slider-item"><span class="key">扩散</span><input type="range" id="adj-df" min="0" max="200" value="100" oninput="onAdj()"><span class="val" id="val-df">100</span></div>
+  <div class="slider-item"><span class="key">抖动</span><select id="adj-dither" onchange="onAdj()">
+    <option value="floydSteinberg">Floyd-Steinberg</option>
+    <option value="atkinson">Atkinson</option>
+    <option value="jarvis">Jarvis-Judice-Ninke</option>
+    <option value="stucki">Stucki</option>
+    <option value="burkes">Burkes</option>
+    <option value="sierra3">Sierra-3</option>
+    <option value="sierra2">Sierra-2</option>
+  </select></div>
+</div>
+<div class="save-row"><button class="btn-save" onclick="saveAdj()">💾 保存当前调色到设置</button><span class="msg" id="msg-save"></span></div>
+<div class="upload" onclick="document.getElementById('file').click()">点击上传其他图片（JPG/PNG/BMP）</div>
+<input type="file" id="file" accept="image/*" style="display:none" onchange="fileChanged(this)">
+<script type="module">
+import { ditherImage, replaceColors, aitjcizeSpectra6Palette } from '/lib/epdoptimize.js';
+import { ditherImage as odDither, ColorScheme, DitherMode } from '/lib/opendisplay.js';
 
-  <script>
-    const PHOTOS = {data_json};
-    const SELECTED_IMG = {selected_json};
+function $(id){return document.getElementById(id)}
+const selectedImg = {{ selected_json|safe }};
+const photoInfo = {{ info_json|safe }};
+const esp32Default = "{{ esp32_host }}";
+const savedAdj = {{ render_adj_json|safe }};
+const savedDither = "{{ render_dither }}";
+let srcCanvas=null, bmpEpd=null, bmpOd=null;
+let W=480, H=800;
 
-    const byDate = new Map();
-    for (const p of PHOTOS) {{
-      if (!p.date) continue;
-      if (!byDate.has(p.date)) byDate.set(p.date, []);
-      byDate.get(p.date).push(p);
-    }}
-    for (const [d, arr] of byDate.entries()) {{
-      arr.sort((a, b) => ((b.memory ?? -1) - (a.memory ?? -1)));
-    }}
-
-    const canvas = document.getElementById('previewCanvas');
-    const ctx = canvas.getContext('2d');
-    const statusLine = document.getElementById('statusLine');
-
-    const kpiDate = document.getElementById('kpiDate');
-    const kpiLocation = document.getElementById('kpiLocation');
-    const kpiSide = document.getElementById('kpiSide');
-
-    const fieldPath = document.getElementById('fieldPath');
-    const fieldOrigPath = document.getElementById('fieldOrigPath');
-    const fieldType = document.getElementById('fieldType');
-    const fieldCaption = document.getElementById('fieldCaption');
-    const fieldReason = document.getElementById('fieldReason');
-    const fieldRes = document.getElementById('fieldRes');
-    const fieldOrientation = document.getElementById('fieldOrientation');
-    const fieldUsedAt = document.getElementById('fieldUsedAt');
-    const fieldExifSummary = document.getElementById('fieldExifSummary');
-    const fieldExifJson = document.getElementById('fieldExifJson');
-
-    // 评分条
-    const barMemory = document.getElementById('barMemory');
-    const barBeauty = document.getElementById('barBeauty');
-    const numMemory = document.getElementById('numMemory');
-    const numBeauty = document.getElementById('numBeauty');
-
-    let currentDate = null;
-    let currentPhoto = null;
-
-    function formatLocation(lat, lon, city) {{
-      const c = (city || '').trim();
-      if (c.length > 0) return c;
-      if (lat == null || lon == null) return '';
-      try {{
-        return Number(lat).toFixed(5) + ', ' + Number(lon).toFixed(5);
-      }} catch (e) {{
-        return String(lat) + ', ' + String(lon);
-      }}
-    }}
-
-    function formatDateDisplay(dateStr) {{
-      if (!dateStr) return '';
-      const parts = dateStr.split('-');
-      if (parts.length < 3) return dateStr;
-      const y = parts[0];
-      const m = String(parseInt(parts[1], 10));
-      const d = String(parseInt(parts[2], 10));
-      return y + '.' + m + '.' + d;
-    }}
-
-    function escapeHtml(s) {{
-      return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }}
-
-    function hashToHue(str) {{
-      // 简单稳定 hash -> 0..359
-      let h = 0;
-      const s = String(str || '');
-      for (let i = 0; i < s.length; i++) {{
-        h = (h * 31 + s.charCodeAt(i)) >>> 0;
-      }}
-      return h % 360;
-    }}
-
-    function renderTags(tags) {{
-      if (!Array.isArray(tags) || tags.length === 0) return '';
-      let htmlOut = '';
-      for (const t of tags) {{
-        if (!t) continue;
-        const hue = hashToHue(t);
-        const bg = 'hsla(' + hue + ', 90%, 55%, 0.14)';
-        const bd = 'hsla(' + hue + ', 90%, 55%, 0.30)';
-        const dot = 'hsl(' + hue + ', 90%, 62%)';
-        htmlOut += '<span class="chip" style="background:' + bg + '; border-color:' + bd + ';">'
-          + '<span class="chip-dot" style="background:' + dot + ';"></span>'
-          + escapeHtml(t)
-          + '</span>';
-      }}
-      return htmlOut;
-    }}
-
-    function safeText(v) {{
-      if (v === null || v === undefined) return '';
-      return String(v);
-    }}
-
-    function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {{
-      if (!text) return;
-      const words = text.split(/\\s+/);
-      let line = '';
-      let lineCount = 0;
-      for (let n = 0; n < words.length; n++) {{
-        const testLine = line ? (line + ' ' + words[n]) : words[n];
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && n > 0) {{
-          ctx.fillText(line, x, y);
-          line = words[n];
-          y += lineHeight;
-          lineCount++;
-          if (lineCount >= maxLines) break;
-        }} else {{
-          line = testLine;
-        }}
-      }}
-      if (line && lineCount < maxLines) ctx.fillText(line, x, y);
-    }}
-
-    function applyFourColorDither() {{
-      const w = canvas.width, h = canvas.height;
-      let imgData;
-      try {{
-        imgData = ctx.getImageData(0, 0, w, h);
-      }} catch (e) {{
-        statusLine.textContent = '无法从画布读取像素（跨域或图片未走 /images）：' + e;
-        return;
-      }}
-      const data = imgData.data;
-
-      const palette = [
-        {{ r: 0, g: 0, b: 0 }},
-        {{ r: 255, g: 255, b: 255 }},
-        {{ r: 200, g: 0, b: 0 }},
-        {{ r: 220, g: 180, b: 0 }}
-      ];
-
-      const errR = new Float32Array(w);
-      const errG = new Float32Array(w);
-      const errB = new Float32Array(w);
-      const nextErrR = new Float32Array(w);
-      const nextErrG = new Float32Array(w);
-      const nextErrB = new Float32Array(w);
-
-      function nearestColor(r, g, b) {{
-        let bestIndex = 0;
-        let bestDist = Infinity;
-        for (let i = 0; i < palette.length; i++) {{
-          const pr = palette[i].r, pg = palette[i].g, pb = palette[i].b;
-          const dr = r - pr, dg = g - pg, db = b - pb;
-          const dist = dr*dr + dg*dg + db*db;
-          if (dist < bestDist) {{ bestDist = dist; bestIndex = i; }}
-        }}
-        return palette[bestIndex];
-      }}
-
-      for (let y = 0; y < h; y++) {{
-        for (let x = 0; x < w; x++) {{
-          const idx = (y * w + x) * 4;
-
-          let r = data[idx] + errR[x];
-          let g = data[idx + 1] + errG[x];
-          let b = data[idx + 2] + errB[x];
-
-          r = r < 0 ? 0 : (r > 255 ? 255 : r);
-          g = g < 0 ? 0 : (g > 255 ? 255 : g);
-          b = b < 0 ? 0 : (b > 255 ? 255 : b);
-
-          const nc = nearestColor(r, g, b);
-
-          data[idx] = nc.r;
-          data[idx + 1] = nc.g;
-          data[idx + 2] = nc.b;
-
-          const er = r - nc.r, eg = g - nc.g, eb = b - nc.b;
-
-          if (x + 1 < w) {{
-            errR[x + 1] += er * (7 / 16);
-            errG[x + 1] += eg * (7 / 16);
-            errB[x + 1] += eb * (7 / 16);
-          }}
-          if (y + 1 < h) {{
-            if (x > 0) {{
-              nextErrR[x - 1] += er * (3 / 16);
-              nextErrG[x - 1] += eg * (3 / 16);
-              nextErrB[x - 1] += eb * (3 / 16);
-            }}
-            nextErrR[x] += er * (5 / 16);
-            nextErrG[x] += eg * (5 / 16);
-            nextErrB[x] += eb * (5 / 16);
-            if (x + 1 < w) {{
-              nextErrR[x + 1] += er * (1 / 16);
-              nextErrG[x + 1] += eg * (1 / 16);
-              nextErrB[x + 1] += eb * (1 / 16);
-            }}
-          }}
-        }}
-
-        if (y + 1 < h) {{
-          for (let i = 0; i < w; i++) {{
-            errR[i] = nextErrR[i]; errG[i] = nextErrG[i]; errB[i] = nextErrB[i];
-            nextErrR[i] = 0; nextErrG[i] = 0; nextErrB[i] = 0;
-          }}
-        }}
-      }}
-
-      ctx.putImageData(imgData, 0, 0);
-    }}
-
-    function updateMeta(photo) {{
-      if (!photo) {{
-        kpiDate.textContent = '';
-        kpiLocation.textContent = '';
-        kpiSide.textContent = '';
-
-        fieldPath.textContent = '';
-        fieldOrigPath.textContent = '';
-        fieldType.innerHTML = '';
-        fieldCaption.textContent = '';
-        fieldReason.textContent = '';
-        fieldRes.textContent = '';
-        fieldOrientation.textContent = '';
-        fieldUsedAt.textContent = '';
-        fieldExifSummary.textContent = '';
-        fieldExifJson.textContent = '';
-        // 清空评分条
-        barMemory.style.width = '0%';
-        barBeauty.style.width = '0%';
-        numMemory.textContent = '';
-        numBeauty.textContent = '';
-        return;
-      }}
-
-      // 填充 meta-box 新结构
-      kpiSide.textContent = photo.side ? '「' + safeText(photo.side) + '」' : '';
-      fieldType.innerHTML = renderTags(photo.type);
-      fieldCaption.textContent = safeText(photo.caption);
-
-      // 评分条
-      const m = photo.memory != null ? Math.max(0, Math.min(100, photo.memory)) : 0;
-      const b = photo.beauty != null ? Math.max(0, Math.min(100, photo.beauty)) : 0;
-      barMemory.style.width = m + '%';
-      barBeauty.style.width = b + '%';
-      numMemory.textContent = m ? m.toFixed(1) : '';
-      numBeauty.textContent = b ? b.toFixed(1) : '';
-
-      fieldReason.textContent = photo.reason ? '评分理由：' + safeText(photo.reason) : '';
-
-      // 更多信息区
-      const loc = formatLocation(photo.lat, photo.lon, photo.city);
-      kpiDate.textContent = safeText(photo.date);
-      kpiLocation.textContent = safeText(loc);
-      fieldPath.textContent = safeText(photo.path);
-      fieldOrigPath.textContent = safeText(photo.orig_path || '');
-      const res = (safeText(photo.width) || safeText(photo.height)) ? (safeText(photo.width) + ' x ' + safeText(photo.height)) : '';
-      fieldRes.textContent = res;
-      fieldOrientation.textContent = safeText(photo.orientation);
-      fieldUsedAt.textContent = safeText(photo.used_at);
-      fieldExifSummary.textContent = safeText(photo.exif_summary);
-      fieldExifJson.textContent = safeText(photo.exif_json);
-    }}
-
-    function drawPreview(photo) {{
-      if (!photo) {{
-        statusLine.textContent = '未指定照片。请从 /review 点击某张照片进入模拟器。';
-        return;
-      }}
-
-      statusLine.textContent = ''; // 正常情况不显示废话
-
-      canvas.width = 480;
-      canvas.height = 800;
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const img = new Image();
-      img.onload = function() {{
-          canvas.width = 480;
-          canvas.height = 800;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, 480, 800);
-        }};
-      img.onerror = function() {{
-        statusLine.textContent = '图片加载失败：' + photo.path;
-      }};
-      img.src = '/sim_render?img=' + encodeURIComponent(photo.path);
-    }}
-
-    function pickPhotoFromDate(date) {{
-      const arr = byDate.get(date) || [];
-      if (!arr.length) return null;
-
-      const THRESHOLD = {float(getattr(cfg, "MEMORY_THRESHOLD", 70.0) or 70.0)};
-      const candidates = arr.filter(p => p.memory != null && p.memory > THRESHOLD);
-      if (candidates.length > 0) {{
-        const idx = Math.floor(Math.random() * candidates.length);
-        return {{ photo: candidates[idx], dateUsed: date }};
-      }}
-
-      // 兜底：当天随便挑
-      const idx = Math.floor(Math.random() * arr.length);
-      return {{ photo: arr[idx], dateUsed: date, fallbackNoThreshold: true }};
-    }}
-
-    function getPreviousDateStr(dateStr) {{
-      if (!dateStr) return null;
-      const parts = dateStr.split('-');
-      if (parts.length < 3) return null;
-      const y = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10);
-      const d = parseInt(parts[2], 10);
-      if (!y || !m || !d) return null;
-      const dt = new Date(y, m - 1, d);
-      dt.setDate(dt.getDate() - 1);
-      const yy = dt.getFullYear();
-      const mm = String(dt.getMonth() + 1).padStart(2, '0');
-      const dd = String(dt.getDate()).padStart(2, '0');
-      return yy + '-' + mm + '-' + dd;
-    }}
-
-    function pickPhotoWithLookback(baseDate) {{
-      if (!baseDate) return null;
-      let date = baseDate;
-      const MAX_LOOKBACK = 30;
-
-      for (let i = 0; i < MAX_LOOKBACK; i++) {{
-        const picked = pickPhotoFromDate(date);
-        if (picked && picked.photo) return picked;
-        const prev = getPreviousDateStr(date);
-        if (!prev) break;
-        date = prev;
-      }}
-
-      // 最终兜底：目标日期没找到 map，啥也不干
-      return null;
-    }}
-
-    function findSelectedPhoto() {{
-      if (!SELECTED_IMG) return null;
-      for (const p of PHOTOS) {{
-        if (p.path === SELECTED_IMG) return p;
-      }}
-      return null;
-    }}
-
-    function onRerollSameDay() {{
-      if (!currentDate) {{
-        statusLine.textContent = '请从 /review 点击某张照片进入模拟器。';
-        return;
-      }}
-
-      const pick = pickPhotoWithLookback(currentDate);
-      if (!pick || !pick.photo) {{
-        statusLine.textContent = '该日期及向前 30 天内没有可用照片。';
-        return;
-      }}
-
-      // 如果刚好又抽到自己，尝试再抽几次
-      let tries = 0;
-      let chosen = pick;
-      while (tries < 6 && chosen && chosen.photo && currentPhoto && chosen.photo.path === currentPhoto.path) {{
-        const again = pickPhotoWithLookback(currentDate);
-        if (!again || !again.photo) break;
-        chosen = again;
-        tries++;
-      }}
-
-      currentPhoto = chosen.photo;
-      updateMeta(currentPhoto);
-      drawPreview(currentPhoto);
-    }}
-
-    document.getElementById('rerollBtn').addEventListener('click', onRerollSameDay);
-
-    // 默认进入：如果从 review 点进来，则显示该照片；否则提示用户从 review 进入
-    const initPhoto = findSelectedPhoto();
-    if (!initPhoto) {{
-      updateMeta(null);
-      drawPreview(null);
-    }} else {{
-      currentDate = initPhoto.date;
-      currentPhoto = initPhoto;
-      updateMeta(currentPhoto);
-      drawPreview(currentPhoto);
-    }}
-  </script>
-</body>
-</html>
-"""
-    return html_str
-
-
-# --------------------------
-# Routes
-# --------------------------
-
-@app.get("/")
-def index():
-    if ENABLE_REVIEW_WEBUI:
-        return redirect("/review")
-    return Response("InkTime server running. WebUI disabled.", mimetype="text/plain; charset=utf-8")
+function buildBmpRaw(data,w,h){
+  var rs=Math.ceil(3*w/4)*4, ps=rs*h, total=54+ps, bmp=new Uint8Array(total), dv=new DataView(bmp.buffer);
+  dv.setUint8(0,0x42);dv.setUint8(1,0x4D);
+  dv.setUint32(2,total,true);dv.setUint32(10,54,true);
+  dv.setUint32(14,40,true);dv.setUint32(18,w,true);dv.setUint32(22,h,true);
+  dv.setUint16(26,1,true);dv.setUint16(28,24,true);dv.setUint32(34,ps,true);
+  var off=54;for(var y=h-1;y>=0;y--){var ro=0;
+    for(var x=0;x<w;x++){var i=(y*w+x)*4;bmp[off+ro]=data[i+2];bmp[off+ro+1]=data[i+1];bmp[off+ro+2]=data[i];ro+=3}
+    while(ro%4){bmp[off+ro]=0;ro++}off+=rs}
+  return bmp;
+}
+function cl(v){return Math.max(0,Math.min(255,v))}
+function getAdj(){
+  return { br:Number($('adj-br').value), ct:Number($('adj-ct').value), st:Number($('adj-st').value),
+           sh:Number($('adj-sh').value), df:Number($('adj-df').value), dither:$('adj-dither').value };
+}
+async function runEpd(){
+  if(!srcCanvas)return;
+  var a=getAdj();
+  var sc=$('cb-src'), cal=$('cb-cal'), dev=$('cb-dev');
+  sc.width=W;sc.height=H;sc.getContext('2d').drawImage(srcCanvas,0,0);
+  cal.width=W;cal.height=H;dev.width=W;dev.height=H;
+  await ditherImage(sc, cal, {
+    palette: aitjcizeSpectra6Palette, errorDiffusionMatrix: a.dither, ditheringType:'errorDiffusion',
+    serpentine:true, colorMatching:'lab',
+    toneMapping:{mode:'contrast', exposure:a.br/100, saturation:a.st/50, contrast:a.ct/50, strength:a.df/100},
+    clarity:{amount:a.sh/100, radius:1},
+    dynamicRangeCompression:{mode:'auto', strength:0.5},
+    processingEngine:'js', adjustmentEngine:'js'});
+  replaceColors(cal, dev, aitjcizeSpectra6Palette);
+  $('preview-epd').src=cal.toDataURL();
+  bmpEpd=buildBmpRaw(dev.getContext('2d').getImageData(0,0,W,H).data, W, H);
+}
+function sharpen(d,w,h,s){
+  if(s<=0)return d;var t=s/100,ctr=1+4*t,n=-t;
+  var o=new Uint8ClampedArray(d.length);
+  for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+    var i=(y*w+x)*4,r=d[i]*ctr,g=d[i+1]*ctr,b=d[i+2]*ctr;
+    if(x>0){var j=i-4;r+=d[j]*n;g+=d[j+1]*n;b+=d[j+2]*n}
+    if(x+1<w){var j=i+4;r+=d[j]*n;g+=d[j+1]*n;b+=d[j+2]*n}
+    if(y>0){var j=i-w*4;r+=d[j]*n;g+=d[j+1]*n;b+=d[j+2]*n}
+    if(y+1<h){var j=i+w*4;r+=d[j]*n;g+=d[j+1]*n;b+=d[j+2]*n}
+    o[i]=cl(r);o[i+1]=cl(g);o[i+2]=cl(b);o[i+3]=d[i+3]}
+  return o;
+}
+var pal=[[0,0,0],[255,255,255],[255,255,0],[255,0,0],null,[0,0,255],[0,255,0]];
+var calCol=[[31,34,38],[185,199,201],[193,187,30],[98,32,30],null,[35,63,142],[53,86,58]];
+var devCol=[[0,0,0],[255,255,255],[255,255,0],[255,0,0],null,[0,0,255],[0,255,0]];
+function runOd(){
+  if(!srcCanvas)return;
+  var a=getAdj();
+  var sc=$('co-src'), out=$('co-out');
+  sc.width=W;sc.height=H;
+  var ctx=sc.getContext('2d');ctx.drawImage(srcCanvas,0,0);
+  var id=ctx.getImageData(0,0,W,H), d=id.data;
+  var bf=1+a.br/100, cf=1+a.ct/100, sf=1+a.st/100;
+  for(var y=0;y<H;y++)for(var x=0;x<W;x++){
+    var i=(y*W+x)*4,r=d[i],g=d[i+1],b=d[i+2];
+    r=cl(r*bf);g=cl(g*bf);b=cl(b*bf);
+    r=cl((r-128)*cf+128);g=cl((g-128)*cf+128);b=cl((b-128)*cf+128);
+    var gy=0.299*r+0.587*g+0.114*b;
+    d[i]=cl(gy+(r-gy)*sf);d[i+1]=cl(gy+(g-gy)*sf);d[i+2]=cl(gy+(b-gy)*sf);
+  }
+  if(a.sh>0){id.data.set(sharpen(d,W,H,a.sh))}
+  var modeName={floydSteinberg:'FLOYD_STEINBERG',atkinson:'ATKINSON',jarvis:'JARVIS_JUDICE_NINKE',stucki:'STUCKI',burkes:'BURKES',sierra3:'SIERRA',sierra2:'SIERRA_LITE'};
+  var mode=DitherMode[modeName[a.dither]]||DitherMode.BURKES;
+  var r=odDither({width:W,height:H,data:id.data}, ColorScheme.BWGBRY, {mode:mode, serpentine:true});
+  out.width=W;out.height=H;
+  var di=out.getContext('2d').createImageData(W,H);
+  var prev=document.createElement('canvas');prev.width=W;prev.height=H;
+  var pi=prev.getContext('2d').createImageData(W,H);
+  for(var i=0;i<r.indices.length;i++){
+    var c=r.palette[r.indices[i]], pr=c.r, pg=c.g, pb=c.b, idx=-1;
+    for(var k=0;k<pal.length;k++){if(!pal[k])continue;
+      if(pr===pal[k][0]&&pg===pal[k][1]&&pb===pal[k][2]){idx=k;break}}
+    if(idx>=0&&calCol[idx]){pi.data[i*4]=calCol[idx][0];pi.data[i*4+1]=calCol[idx][1];pi.data[i*4+2]=calCol[idx][2]}
+    else{pi.data[i*4]=pr;pi.data[i*4+1]=pg;pi.data[i*4+2]=pb}
+    pi.data[i*4+3]=255;
+    if(idx>=0&&devCol[idx]){di.data[i*4]=devCol[idx][0];di.data[i*4+1]=devCol[idx][1];di.data[i*4+2]=devCol[idx][2]}
+    else{di.data[i*4]=pr;di.data[i*4+1]=pg;di.data[i*4+2]=pb}
+    di.data[i*4+3]=255;
+  }
+  prev.getContext('2d').putImageData(pi,0,0);
+  out.getContext('2d').putImageData(di,0,0);
+  $('preview-od').src=prev.toDataURL();
+  bmpOd=buildBmpRaw(di.data,W,H);
+}
+function processAndRender(img){
+  // 自动适配比例：图高>宽用竖屏 480x800，否则横屏 800x480（与相框固件 applyScale 一致）
+  const nw=img.naturalWidth, nh=img.naturalHeight;
+  let tw=800, th=480;
+  if(nh>nw){tw=480; th=800}
+  W=tw; H=th;
+  const c=document.createElement('canvas'); c.width=tw; c.height=th;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,tw,th);
+  // 偏差 >= 25% 时等比留白，否则拉伸填满
+  const dev=Math.abs(nw/nh - tw/th)/(tw/th);
+  if(dev>=0.25){
+    const s=Math.min(tw/nw, th/nh);
+    const dw=nw*s, dh=nh*s;
+    ctx.drawImage(img,(tw-dw)/2,(th-dh)/2,dw,dh);
+  } else {
+    ctx.drawImage(img,0,0,tw,th);
+  }
+  srcCanvas=c;
+  $('preview-orig').src=c.toDataURL();
+  onAdj();
+}
+function loadImg(url){return new Promise(function(res,rej){var im=new Image();im.onload=function(){res(im)};im.onerror=function(){rej(new Error('fail'))};im.src=url})}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function scoreBar(label,val,cls){
+  const v=Math.max(0,Math.min(100,Number(val)||0));
+  return '<div class="srow"><span class="skey">'+esc(label)+'</span><div class="sbar"><div class="sbar-fill '+cls+'" style="width:'+v+'%"></div></div><span class="sval">'+Math.round(v)+'</span></div>';
+}
+function renderInfo(){
+  const ib=$('infoBar');
+  if(!photoInfo||!Object.keys(photoInfo).length){ib.textContent='该照片暂无评分信息';return}
+  let h='';
+  if(photoInfo.memory!=null)h+=scoreBar('回忆分',photoInfo.memory,'mem');
+  if(photoInfo.beauty!=null)h+=scoreBar('美观分',photoInfo.beauty,'bea');
+  const rows=[];
+  if(photoInfo.side)rows.push('<div class="srow"><span class="skey">文案</span><span class="sval2">'+esc(photoInfo.side)+'</span></div>');
+  if(photoInfo.type)rows.push('<div class="srow"><span class="skey">类型</span><span class="sval2">'+esc(photoInfo.type)+'</span></div>');
+  if(photoInfo.date)rows.push('<div class="srow"><span class="skey">日期</span><span class="sval2">'+esc(photoInfo.date)+'</span></div>');
+  if(photoInfo.reason)rows.push('<div class="srow"><span class="skey">理由</span><span class="sval2">'+esc(photoInfo.reason)+'</span></div>');
+  if(photoInfo.city)rows.push('<div class="srow"><span class="skey">地点</span><span class="sval2">'+esc(photoInfo.city)+'</span></div>');
+  if(photoInfo.exif_summary)rows.push('<div class="srow"><span class="skey">EXIF</span><span class="sval2">'+esc(photoInfo.exif_summary)+'</span></div>');
+  if(photoInfo.width&&photoInfo.height)rows.push('<div class="srow"><span class="skey">尺寸</span><span class="sval2">'+esc(photoInfo.width+'x'+photoInfo.height+(photoInfo.orientation?' ('+photoInfo.orientation+')':''))+'</span></div>');
+  if(photoInfo.used_at)rows.push('<div class="srow"><span class="skey">使用</span><span class="sval2">'+esc(photoInfo.used_at)+'</span></div>');
+  if(photoInfo.caption)rows.push('<div class="srow"><span class="skey">描述</span><span class="sval2">'+esc(photoInfo.caption)+'</span></div>');
+  ib.innerHTML=h+rows.join('');
+}
+let adjTimer=null;
+function onAdj(){
+  $('val-br').textContent=$('adj-br').value;$('val-ct').textContent=$('adj-ct').value;
+  $('val-st').textContent=$('adj-st').value;$('val-sh').textContent=$('adj-sh').value;
+  $('val-df').textContent=$('adj-df').value;
+  if(adjTimer)clearTimeout(adjTimer);
+  adjTimer=setTimeout(function(){runEpd();runOd()},300);
+}
+function saveAdj(){
+  var a=getAdj();
+  var m=$('msg-save');m.textContent='保存中...';m.className='msg';
+  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({RENDER_ADJ:{br:a.br,ct:a.ct,st:a.st,sh:a.sh,df:a.df},RENDER_DITHER:a.dither})})
+  .then(function(r){return r.json()}).then(function(d){
+    m.textContent=d.ok?'已保存到设置（render 将用此调色）':'保存失败';m.className='msg '+(d.ok?'ok':'err');
+  }).catch(function(){m.textContent='保存失败';m.className='msg err'});
+}
+function sendTo(msgId,bmp){
+  if(!bmp){var m=$(msgId);m.textContent='请先选图';m.className='msg err';return}
+  var host=($('esp32-host').value.trim()||esp32Default);host=host.replace('http://','').replace('https://','');
+  var name='ai_'+Math.floor(Date.now()/1000)+'.bmp';
+  var m=$(msgId);m.textContent='推送中...';m.className='msg';
+  var x=new XMLHttpRequest();x.open('POST','http://'+host+'/api/upload?name='+encodeURIComponent(name));
+  x.onload=function(){m.textContent='已推送 '+name+' ('+x.status+')';m.className='msg '+(x.status==200?'ok':'err')};
+  x.onerror=function(){m.textContent='连接失败';m.className='msg err'};
+  x.send(bmp);
+}
+function sendEpd(){sendTo('msg-epd',bmpEpd)}
+function sendOd(){sendTo('msg-od',bmpOd)}
+function fileChanged(input){var f=input.files[0];if(!f)return;var im=new Image();im.onload=function(){processAndRender(im)};im.src=URL.createObjectURL(f)}
+function initAdj(){
+  if(savedAdj){
+    if(savedAdj.br!=null)$('adj-br').value=savedAdj.br;
+    if(savedAdj.ct!=null)$('adj-ct').value=savedAdj.ct;
+    if(savedAdj.st!=null)$('adj-st').value=savedAdj.st;
+    if(savedAdj.sh!=null)$('adj-sh').value=savedAdj.sh;
+    if(savedAdj.df!=null)$('adj-df').value=savedAdj.df;
+  }
+  if(savedDither)$('adj-dither').value=savedDither;
+}
+async function init(){
+  renderInfo();
+  initAdj();
+  if(selectedImg){try{var im=await loadImg(selectedImg);processAndRender(im)}catch(e){}}
+}
+init();
+window.sendEpd=sendEpd;window.sendOd=sendOd;window.fileChanged=fileChanged;window.onAdj=onAdj;window.saveAdj=saveAdj;
+</script></body></html>"""
 
 
 @app.get("/review")
@@ -1916,7 +1316,6 @@ def review():
     return Response(html_str, mimetype="text/html; charset=utf-8")
 
 
-# API endpoint for md list
 @app.get('/api/md_list')
 def api_md_list():
     _require_webui_enabled()
@@ -2140,31 +1539,35 @@ _SETTINGS_HTML = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI-Picker 设置</title>
 <style>
-*{box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#c9d1d9;padding:14px;max-width:760px;margin:0 auto}
-h1{font-size:17px}fieldset{border:1px solid #30363d;border-radius:6px;padding:10px 12px;margin:10px 0}
-legend{font-size:12px;color:#8b949e;padding:0 4px}
-label{display:block;font-size:12px;margin:6px 0}
-label span{display:inline-block;width:220px;color:#8b949e}
-input[type=text],input[type=number],input[type=password],select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;padding:4px 6px;font-size:12px;width:300px}
-input[type=checkbox]{transform:scale(1.2)}
-button{background:#238636;border:none;color:#fff;border-radius:4px;padding:6px 14px;cursor:pointer;font-size:12px}
-button.sec{background:#1f6feb;margin-right:6px}button.orange{background:#bc4c00}button.red{background:#da3633}
-.actions{margin:10px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.nav{display:flex;gap:8px;margin:10px 0 4px;flex-wrap:wrap}
-.nav a{background:#21262d;border:1px solid #30363d;color:#c9d1d9;text-decoration:none;padding:6px 14px;border-radius:4px;font-size:12px}
-.nav a:hover{background:#30363d}
-.ch-row{border:1px solid #21262d;border-radius:6px;padding:8px;margin:6px 0}
-.ch-f{display:flex;align-items:center;margin:4px 0;gap:6px}
-.ch-f span{display:inline-block;width:72px;color:#8b949e;font-size:12px;flex-shrink:0}
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;padding:24px;max-width:900px;margin:0 auto;font-size:18px;line-height:1.6}
+h1{font-size:25px;color:#e6edf3;margin-bottom:6px}
+fieldset{border:1px solid #30363d;border-radius:12px;padding:16px 18px;margin:14px 0}
+legend{font-size:14px;color:#8b949e;padding:0 8px}
+label{display:block;font-size:14px;margin:10px 0}
+label span{display:inline-block;width:260px;color:#8b949e}
+input[type=text],input[type=number],input[type=password],select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:8px;padding:8px 10px;font-size:14px;width:340px}
+input[type=text]:focus,input[type=number]:focus,input[type=password]:focus{border-color:#58a6ff;outline:none}
+input[type=checkbox]{transform:scale(1.4)}
+button{background:#238636;border:none;color:#fff;border-radius:8px;padding:10px 20px;cursor:pointer;font-size:15px}
+button:hover{filter:brightness(1.1)}
+button.sec{background:#1f6feb;margin-right:8px}button.orange{background:#bc4c00}button.red{background:#da3633}
+.actions{margin:14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.nav{display:flex;gap:12px;margin:14px 0 8px;flex-wrap:wrap}
+.nav a{background:#161b22;border:1px solid #30363d;color:#c9d1d9;text-decoration:none;padding:10px 22px;border-radius:10px;font-size:14px}
+.nav a:hover{background:#1f2a3a}
+.ch-row{border:1px solid #21262d;border-radius:12px;padding:12px;margin:10px 0}
+.ch-f{display:flex;align-items:center;margin:8px 0;gap:10px}
+.ch-f span{display:inline-block;width:88px;color:#8b949e;font-size:14px;flex-shrink:0}
 .ch-f input{flex:1;width:auto}
-.ch-row button{background:#da3633;margin-top:4px}
-pre{background:#010409;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:11px;height:220px;overflow:auto;white-space:pre-wrap;color:#7ee787}
-#status{font-size:12px;color:#8b949e}
+.ch-row button{background:#da3633;margin-top:8px}
+pre{background:#010409;border:1px solid #30363d;border-radius:10px;padding:12px;font-size:13px;height:260px;overflow:auto;white-space:pre-wrap;color:#7ee787}
+#status{font-size:14px;color:#8b949e}
 </style></head><body>
 <h1>AI-Photo-Picker 设置</h1>
 <div class="nav">
   <a href="/review">📷 照片库 /review</a>
-  <a href="/picker">🎨 渲染推送 /picker</a>
+  <a href="/sim">🎨 渲染推送 /sim</a>
   <a href="/settings">⚙️ 设置 /settings</a>
 </div>
 <div class="actions">
