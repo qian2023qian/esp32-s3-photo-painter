@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 相框渲染推送</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#c9d1d9;padding:10px}
+h1{font-size:16px;margin-bottom:4px}.sub{font-size:10px;color:#8b949e;margin-bottom:8px}
+.bar{display:flex;gap:6px;align-items:center;padding:4px 8px;background:#161b22;border-radius:6px;margin-bottom:8px}
+.bar input{flex:1;padding:4px 6px;border-radius:4px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:10px;outline:none}
+.bar button{padding:4px 8px;border:none;border-radius:4px;cursor:pointer;font-size:10px;font-weight:600;background:#238636;color:#fff;white-space:nowrap}
+.upload-zone{border:2px dashed #30363d;border-radius:6px;padding:10px;text-align:center;cursor:pointer;margin-bottom:8px;font-size:12px;color:#8b949e}
+.upload-zone:hover{border-color:#58a6ff}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.panel{background:#161b22;border-radius:6px;padding:8px}
+.panel h2{font-size:11px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.tag{font-size:8px;padding:1px 4px;border-radius:2px}.tag-e{background:#8250df;color:#fff}.tag-o{background:#da3633;color:#fff}
+.panel img{width:100%;max-height:420px;object-fit:contain;display:block;margin:0 auto;border-radius:3px;border:1px solid #21262d;background:#1a1a2e}
+.btn-send{width:100%;margin-top:6px;padding:5px 0;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;color:#fff}
+.msg{font-size:9px;margin-top:3px;text-align:center}.ok{color:#3fb950}.err{color:#f85149}
+.sliders{background:#161b22;border-radius:6px;padding:8px 10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 12px}
+.slider-item{display:flex;align-items:center;gap:6px;font-size:10px}
+.slider-item .key{color:#8b949e;min-width:34px}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:14px;background:transparent;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:#30363d;border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;background:#58a6ff;border-radius:50%;margin-top:-4.5px;cursor:pointer;border:none}
+select{padding:2px 4px;border-radius:4px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:10px}
+.slider-item .val{color:#8b949e;min-width:24px;text-align:right}
+@media(max-width:800px){.cmp{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<h1>AI 相框 · 渲染推送</h1>
+<p class="sub">两套管线（epdoptimize / OpenDisplay）渲染 6 色，调色后推送到 ESP32 相框（文件名 ai_&lt;时间戳&gt;.bmp）</p>
+
+<div class="bar">
+  <span style="font-size:10px;color:#8b949e;white-space:nowrap">ESP32</span>
+  <input id="esp32-host" value="192.168.4.1" placeholder="相框 IP">
+  <button onclick="window.checkEsp32()">检测</button>
+  <span class="msg" id="esp32-status" style="flex:1"></span>
+</div>
+
+<div class="upload-zone" onclick="document.getElementById('file-input').click()">
+  点击选择图片（JPG/PNG/BMP）
+  <input type="file" id="file-input" accept="image/*" style="display:none" onchange="window.fileChanged(this)">
+</div>
+
+<div class="cmp">
+  <div class="panel">
+    <h2><span>epdoptimize</span><span class="tag tag-e">校准色板</span></h2>
+    <canvas id="cb-src" style="display:none"></canvas>
+    <canvas id="cb-cal" style="display:none"></canvas>
+    <canvas id="cb-dev" style="display:none"></canvas>
+    <img id="preview-epd" alt="epd">
+    <button class="btn-send" style="background:#8250df" onclick="window.sendEpd()">推送到相框</button>
+    <p class="msg" id="msg-epd"></p>
+  </div>
+  <div class="panel">
+    <h2><span>OpenDisplay</span><span class="tag tag-o">纯色板</span></h2>
+    <canvas id="co-src" style="display:none"></canvas>
+    <canvas id="co-out" style="display:none"></canvas>
+    <img id="preview-od" alt="od">
+    <button class="btn-send" style="background:#da3633" onclick="window.sendOd()">推送到相框</button>
+    <p class="msg" id="msg-od"></p>
+  </div>
+</div>
+
+<div class="sliders">
+  <div class="slider-item"><span class="key">亮度</span><input type="range" id="adj-br" min="-50" max="50" value="0" oninput="window.onAdj()"><span class="val" id="val-br">0</span></div>
+  <div class="slider-item"><span class="key">对比度</span><input type="range" id="adj-ct" min="-50" max="50" value="20" oninput="window.onAdj()"><span class="val" id="val-ct">20</span></div>
+  <div class="slider-item"><span class="key">饱和度</span><input type="range" id="adj-st" min="-50" max="50" value="20" oninput="window.onAdj()"><span class="val" id="val-st">20</span></div>
+  <div class="slider-item"><span class="key">锐化</span><input type="range" id="adj-sh" min="0" max="100" value="50" oninput="window.onAdj()"><span class="val" id="val-sh">50</span></div>
+  <div class="slider-item"><span class="key">扩散</span><input type="range" id="adj-df" min="0" max="200" value="100" oninput="window.onAdj()"><span class="val" id="val-df">100</span></div>
+  <div class="slider-item"><span class="key">抖动</span><select id="adj-dither" onchange="window.onAdj()">
+    <option value="floydSteinberg">Floyd-Steinberg</option>
+    <option value="atkinson">Atkinson</option>
+    <option value="jarvis">Jarvis-Judice-Ninke</option>
+    <option value="stucki">Stucki</option>
+    <option value="burkes">Burkes</option>
+    <option value="sierra3">Sierra-3</option>
+    <option value="sierra2">Sierra-2</option>
+  </select></div>
+</div>
+
+<script type="module">
+import { ditherImage, replaceColors, aitjcizeSpectra6Palette } from '/lib/epdoptimize.js';
+import { ditherImage as odDither, ColorScheme, DitherMode } from '/lib/opendisplay.js';
+
+function $(id){return document.getElementById(id)}
+var srcImg=null, iW=800, iH=480;
+var bmpEpd=null, bmpOd=null;
+
+function buildBmpRaw(data,w,h){
+  var rs=Math.ceil(3*w/4)*4, ps=rs*h, total=54+ps, bmp=new Uint8Array(total), dv=new DataView(bmp.buffer);
+  dv.setUint8(0,0x42);dv.setUint8(1,0x4D);
+  dv.setUint32(2,total,true);dv.setUint32(10,54,true);
+  dv.setUint32(14,40,true);dv.setUint32(18,w,true);dv.setUint32(22,h,true);
+  dv.setUint16(26,1,true);dv.setUint16(28,24,true);dv.setUint32(34,ps,true);
+  var off=54;for(var y=h-1;y>=0;y--){var ro=0;
+    for(var x=0;x<w;x++){var i=(y*w+x)*4;bmp[off+ro]=data[i+2];bmp[off+ro+1]=data[i+1];bmp[off+ro+2]=data[i];ro+=3}
+    while(ro%4){bmp[off+ro]=0;ro++}off+=rs}
+  return bmp;
+}
+
+function cl(v){return Math.max(0,Math.min(255,v))}
+
+function getAdj(){
+  return { br:Number($('adj-br').value), ct:Number($('adj-ct').value), st:Number($('adj-st').value),
+           sh:Number($('adj-sh').value), df:Number($('adj-df').value), dither:$('adj-dither').value };
+}
+
+// ---- epdoptimize 管线 ----
+async function runEpd(){
+  if(!srcImg)return;
+  var a=getAdj();
+  var sc=$('cb-src'), cal=$('cb-cal'), dev=$('cb-dev');
+  sc.width=iW;sc.height=iH;sc.getContext('2d').drawImage(srcImg,0,0,iW,iH);
+  cal.width=iW;cal.height=iH;dev.width=iW;dev.height=iH;
+  await ditherImage(sc, cal, {
+    palette: aitjcizeSpectra6Palette, errorDiffusionMatrix: a.dither, ditheringType:'errorDiffusion',
+    serpentine:true, colorMatching:'lab',
+    toneMapping:{mode:'contrast', exposure:a.br/100, saturation:a.st/50, contrast:a.ct/50, strength:a.df/100},
+    clarity:{amount:a.sh/100, radius:1},
+    dynamicRangeCompression:{mode:'auto', strength:0.5},
+    processingEngine:'js', adjustmentEngine:'js'});
+  replaceColors(cal, dev, aitjcizeSpectra6Palette);
+  $('preview-epd').src=cal.toDataURL();
+  bmpEpd=buildBmpRaw(dev.getContext('2d').getImageData(0,0,iW,iH).data, iW, iH);
+}
+
+// ---- OpenDisplay 管线 ----
+function sharpen(d,w,h,s){
+  if(s<=0)return d;var t=s/100,ctr=1+4*t,n=-t;
+  var o=new Uint8ClampedArray(d.length);
+  for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+    var i=(y*w+x)*4,r=d[i]*ctr,g=d[i+1]*ctr,b=d[i+2]*ctr;
+    if(x>0){var j=i-4;r+=d[j]*n;g+=d[j+1]*n;b+=d[j+2]*n}
+    if(x+1<w){var j=i+4;r+=d[j]*n;g+=d[j+1]*n;b+=d[j+2]*n}
+    if(y>0){var j=i-w*4;r+=d[j]*n;g+=d[j+1]*n;b+=d[j+2]*n}
+    if(y+1<h){var j=i+w*4;r+=d[j]*n;g+=d[j+1]*n;b+=d[j+2]*n}
+    o[i]=cl(r);o[i+1]=cl(g);o[i+2]=cl(b);o[i+3]=d[i+3]}
+  return o;
+}
+var pal=[[0,0,0],[255,255,255],[255,255,0],[255,0,0],null,[0,0,255],[0,255,0]];
+var calCol=[[31,34,38],[185,199,201],[193,187,30],[98,32,30],null,[35,63,142],[53,86,58]];
+var devCol=[[0,0,0],[255,255,255],[255,255,0],[255,0,0],null,[0,0,255],[0,255,0]];
+
+function runOd(){
+  if(!srcImg)return;
+  var a=getAdj();
+  var sc=$('co-src'), out=$('co-out');
+  sc.width=iW;sc.height=iH;
+  var ctx=sc.getContext('2d');ctx.drawImage(srcImg,0,0,iW,iH);
+  var id=ctx.getImageData(0,0,iW,iH), d=id.data;
+  var bf=1+a.br/100, cf=1+a.ct/100, sf=1+a.st/100;
+  for(var y=0;y<iH;y++)for(var x=0;x<iW;x++){
+    var i=(y*iW+x)*4,r=d[i],g=d[i+1],b=d[i+2];
+    r=cl(r*bf);g=cl(g*bf);b=cl(b*bf);
+    r=cl((r-128)*cf+128);g=cl((g-128)*cf+128);b=cl((b-128)*cf+128);
+    var gy=0.299*r+0.587*g+0.114*b;
+    d[i]=cl(gy+(r-gy)*sf);d[i+1]=cl(gy+(g-gy)*sf);d[i+2]=cl(gy+(b-gy)*sf);
+  }
+  if(a.sh>0){id.data.set(sharpen(d,iW,iH,a.sh))}
+  var modeName={floydSteinberg:'FLOYD_STEINBERG',atkinson:'ATKINSON',jarvis:'JARVIS_JUDICE_NINKE',stucki:'STUCKI',burkes:'BURKES',sierra3:'SIERRA',sierra2:'SIERRA_LITE'};
+  var mode=DitherMode[modeName[a.dither]]||DitherMode.BURKES;
+  var r=odDither({width:iW,height:iH,data:id.data}, ColorScheme.BWGBRY, {mode:mode, serpentine:true});
+  out.width=iW;out.height=iH;
+  var di=out.getContext('2d').createImageData(iW,iH);
+  var prev=document.createElement('canvas');prev.width=iW;prev.height=iH;
+  var pi=prev.getContext('2d').createImageData(iW,iH);
+  for(var i=0;i<r.indices.length;i++){
+    var c=r.palette[r.indices[i]], pr=c.r, pg=c.g, pb=c.b, idx=-1;
+    for(var k=0;k<pal.length;k++){if(!pal[k])continue;
+      if(pr===pal[k][0]&&pg===pal[k][1]&&pb===pal[k][2]){idx=k;break}}
+    if(idx>=0&&calCol[idx]){pi.data[i*4]=calCol[idx][0];pi.data[i*4+1]=calCol[idx][1];pi.data[i*4+2]=calCol[idx][2]}
+    else{pi.data[i*4]=pr;pi.data[i*4+1]=pg;pi.data[i*4+2]=pb}
+    pi.data[i*4+3]=255;
+    if(idx>=0&&devCol[idx]){di.data[i*4]=devCol[idx][0];di.data[i*4+1]=devCol[idx][1];di.data[i*4+2]=devCol[idx][2]}
+    else{di.data[i*4]=pr;di.data[i*4+1]=pg;di.data[i*4+2]=pb}
+    di.data[i*4+3]=255;
+  }
+  prev.getContext('2d').putImageData(pi,0,0);
+  out.getContext('2d').putImageData(di,0,0);
+  $('preview-od').src=prev.toDataURL();
+  bmpOd=buildBmpRaw(di.data,iW,iH);
+}
+
+// ---- 交互 ----
+function onAdj(){
+  updLabels();
+  runEpd(); runOd();
+}
+function updLabels(){
+  $('val-br').textContent=$('adj-br').value;
+  $('val-ct').textContent=$('adj-ct').value;
+  $('val-st').textContent=$('adj-st').value;
+  $('val-sh').textContent=$('adj-sh').value;
+  $('val-df').textContent=$('adj-df').value;
+}
+
+function fileChanged(input){
+  var f=input.files[0];if(!f)return;
+  var img=new Image();img.onload=function(){
+    var tw=800,th=480;if(img.naturalWidth<img.naturalHeight){tw=480;th=800}
+    iW=tw;iH=th;srcImg=img;
+    onAdj();
+  };
+  img.src=URL.createObjectURL(f);
+}
+
+function hostUrl(){return 'http://'+$('esp32-host').value.trim()}
+
+function sendTo(msgId,bmp){
+  if(!bmp){var m=$(msgId);m.textContent='请先选择图片';m.className='msg err';return}
+  var name='ai_'+Math.floor(Date.now()/1000)+'.bmp';
+  var m=$(msgId);m.textContent='推送中...';m.className='msg';
+  var x=new XMLHttpRequest();x.open('POST',hostUrl()+'/api/upload?name='+encodeURIComponent(name));
+  x.onload=function(){m.textContent='已推送 '+name+' ('+x.status+')';m.className='msg '+(x.status==200?'ok':'err')};
+  x.onerror=function(){m.textContent='连接失败';m.className='msg err'};
+  x.send(bmp);
+}
+function sendEpd(){sendTo('msg-epd',bmpEpd)}
+function sendOd(){sendTo('msg-od',bmpOd)}
+
+async function checkEsp32(){
+  var s=$('esp32-status');s.textContent='检测中...';s.className='msg';
+  try{
+    var r=await fetch(hostUrl()+'/api/status');
+    if(r.ok){var d=await r.json();s.textContent='已连接 — '+d.img_count+' 张';s.className='msg ok'}
+    else{s.textContent='响应异常';s.className='msg err'}
+  }catch(e){s.textContent='无法连接';s.className='msg err'}
+}
+
+window.fileChanged=fileChanged;window.onAdj=onAdj;window.checkEsp32=checkEsp32;
+window.sendEpd=sendEpd;window.sendOd=sendOd;
+</script>
+</body>
+</html>
