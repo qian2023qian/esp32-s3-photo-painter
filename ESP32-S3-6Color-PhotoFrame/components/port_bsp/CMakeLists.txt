@@ -12,6 +12,7 @@ idf_component_register(
     "./src/fonts/font18CN.c"
     "./src/fonts/font22CN.c"
     "./src/fonts/font24.c"
+    "./src/fonts/fontBatteryCN.c"
     "traverse_nvs.cpp"
     PRIV_REQUIRES 
     nvs_flash

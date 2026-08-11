@@ -16,3 +16,5 @@ void Custom_PmicPortInit(I2cMasterBus *i2cbus,uint8_t dev_addr);
 void Custom_PmicRegisterInit(void);
 void Axp2101_isChargingTask(void *arg);
 PmicRegisterConfig Custom_PmicGetBatteryInfo(void);
+int Custom_PmicGetBatteryPercent(void);   // -1 = 电池未接入
+int Custom_PmicGetBatteryVoltage(void);   // mV

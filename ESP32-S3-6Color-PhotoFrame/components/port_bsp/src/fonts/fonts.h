@@ -84,6 +84,7 @@ extern sFONT Font24;
 extern cFONT Font22CN;
 extern cFONT Font14CN;
 extern cFONT Font18CN;
+extern cFONT FontBatteryCN;
 
 #ifdef __cplusplus
 }

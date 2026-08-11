@@ -10,6 +10,8 @@
 #include "led_bsp.h"
 #include "imgdecode_app.h"
 
+extern "C" bool photo_show_battery_page(bool low);   // 定义于 PhotoFrame_mode.cpp
+
 CustomSDPort *SDPort = NULL;
 ImgDecodeDither decdither;
 ePaperPort ePaperDisplay(decdither,11,10,8,9,12,13,800,480,1350,1350);
@@ -154,20 +156,11 @@ static void boot_button_user_Task(void *arg) {
     for (;;) {
         EventBits_t even = xEventGroupWaitBits(BootButtonGroups, (0x04), pdTRUE, pdFALSE, pdMS_TO_TICKS(2000));
         if(even & 0x04) { //双击
-            if (pdTRUE == xSemaphoreTake(epaper_gui_semapHandle, 2000)) {
-                xEventGroupSetBits(Green_led_Mode_queue,set_bit_button(6));
-                Green_led_arg                   = 1;
-                /*显示电池状态信息*/
-                PmicRegisterConfig pmic = Custom_PmicGetBatteryInfo();
-                ePaperDisplay.EPD_DispClear(ColorWhite);
-                ePaperDisplay.EPD_DrawStringEN(120, 180, pmic.isCharging, &Font24, ColorWhite, ColorBlack);
-                ePaperDisplay.EPD_DrawStringEN(120, 220, pmic.chargeStatus, &Font24, ColorWhite, ColorBlack);
-                ePaperDisplay.EPD_DrawStringEN(120, 260, pmic.batteryVoltage, &Font24, ColorWhite, ColorBlack);
-                ePaperDisplay.EPD_DrawStringEN(120, 300, pmic.batteryPercent, &Font24, ColorWhite, ColorBlack);
-                ePaperDisplay.EPD_Display();
-                xSemaphoreGive(epaper_gui_semapHandle); 
-                Green_led_arg = 0;
-            }
+            xEventGroupSetBits(Green_led_Mode_queue,set_bit_button(6));
+            Green_led_arg = 1;
+            /*显示电池状态信息（中文电量页，内部自取互斥锁）*/
+            photo_show_battery_page(false);
+            Green_led_arg = 0;
         }
     }
 }

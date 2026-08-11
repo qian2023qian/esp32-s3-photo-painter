@@ -131,7 +131,7 @@ PmicRegisterConfig Custom_PmicGetBatteryInfo(void) {
     PmicRegisterConfig config;
     int data = axp2101.readRegister(0x17);
     if(data > 0) {
-        axp2101.writeRegister(0x17,(uint8_t)(data & 0xFB)); 
+        axp2101.writeRegister(0x17,(uint8_t)(data & 0xFB));
     }
     bool is_charging = axp2101.isCharging();
     if(is_charging) {
@@ -158,4 +158,12 @@ PmicRegisterConfig Custom_PmicGetBatteryInfo(void) {
     int battery_percent = axp2101.getBatteryPercent();
     snprintf(config.batteryPercent, sizeof(config.batteryPercent), "Battery Percent : %d%%", battery_percent);
     return config;
+}
+
+int Custom_PmicGetBatteryPercent(void) {
+    return axp2101.getBatteryPercent();   // -1 = 电池未接入
+}
+
+int Custom_PmicGetBatteryVoltage(void) {
+    return axp2101.getBattVoltage();      // mV
 }

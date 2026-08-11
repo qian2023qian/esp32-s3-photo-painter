@@ -15,6 +15,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#c9d
 .wifi-tag{font-size:clamp(10px,1.5vw,13px);padding:3px 8px;border-radius:5px;white-space:nowrap}
 .wifi-on{background:#238636;color:#fff}
 .wifi-off{background:#30363d;color:var(--muted)}
+.batt-low{background:#f85149;color:#fff}
 .card{background:var(--card);border-radius:10px;padding:clamp(10px,1.5vw,18px)}
 .card h2{font-size:clamp(12px,1.8vw,15px);color:var(--muted);margin-bottom:10px;font-weight:500}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
@@ -88,7 +89,10 @@ details{margin-bottom:4px}
 <div class="dash">
 <div class="topbar">
 <h1>PhotoPainter</h1>
+<div style="display:flex;gap:6px">
 <span class="wifi-tag wifi-off" id="wifi-tag">WiFi: --</span>
+<span class="wifi-tag wifi-on" id="batt-tag">电量 --</span>
+</div>
 </div>
 <div class="card">
 <h2>传感器</h2>
@@ -105,6 +109,8 @@ details{margin-bottom:4px}
 <div class="cell"><div class="lbl">当前索引</div><div class="val val-green" id="img-index">--</div></div>
 <div class="cell"><div class="lbl">轮播间隔</div><div class="val" id="img-interval">--</div><div class="unit">分</div></div>
 <div class="cell"><div class="lbl">运行状态</div><div class="val" id="img-running">--</div></div>
+<div class="cell"><div class="lbl">电池电压</div><div class="val val-green" id="batt-volt">--</div><div class="unit">V</div></div>
+<div class="cell"><div class="lbl">充电状态</div><div class="val" id="batt-chg">--</div></div>
 </div>
 </div>
 <div class="card">
@@ -196,10 +202,15 @@ async function api(method,path,body){
 let opts={method:method,headers:{}};if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body)}
 let r=await fetch(path,opts);return r.status<400?r.json():Promise.reject(r)}
 
+var chgMap={"Tri_Charge":"涓流充电","Pre_Charge":"预充电","Constant_Charge":"恒流充电","Constant_Voltage":"恒压充电","Charge_Done":"已充满","Not_Charging":"未充电"};
 function updateStatus(){
 api('GET','/api/status').then(function(d){
 let tag=$('wifi-tag');tag.textContent='WiFi: '+(d.wifi?'已连接':'未连接');
 tag.className='wifi-tag '+(d.wifi?'wifi-on':'wifi-off');
+let bt=$('batt-tag');bt.textContent='电量 '+(d.battery_percent<0?'--':d.battery_percent+'%');
+bt.className='wifi-tag '+(d.low_battery?'batt-low':'wifi-on');
+$('batt-volt').textContent=d.battery_voltage.toFixed(2);
+$('batt-chg').textContent=d.charging?'充电中':(chgMap[d.charge_status]||'--');
 $('img-count').textContent=d.img_count;$('img-index').textContent=d.img_index;
 $('img-interval').textContent=d.interval;$('img-running').textContent=d.running?'运行中':'已暂停';
 $('s-temp').textContent=d.temperature.toFixed(1);$('s-rh').textContent=d.humidity.toFixed(1);

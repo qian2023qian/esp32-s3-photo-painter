@@ -4,6 +4,7 @@
 #include "wifi_manager.h"
 #include "nvs_manager.h"
 #include "mqtt_ha.h"
+#include "power_bsp.h"
 #include "display_bsp.h"
 #include "sdcard_bsp.h"
 #include "button_bsp.h"
@@ -55,6 +56,20 @@ static esp_err_t api_get_status(httpd_req_t *req)
     cJSON_AddBoolToObject(root, "running", photo_running);
     cJSON_AddStringToObject(root, "sleep_start", sleep_start);
     cJSON_AddStringToObject(root, "sleep_end", sleep_end);
+    // 电量信息
+    PmicRegisterConfig pmic = Custom_PmicGetBatteryInfo();
+    int pct = Custom_PmicGetBatteryPercent();
+    int mv  = Custom_PmicGetBatteryVoltage();
+    cJSON_AddNumberToObject(root, "battery_percent", pct);
+    cJSON_AddNumberToObject(root, "battery_voltage", mv / 1000.0f);
+    bool charging = (strstr(pmic.isCharging, "Charging") != NULL)
+                 && (strstr(pmic.isCharging, "Not Charging") == NULL);
+    cJSON_AddBoolToObject(root, "charging", charging);
+    const char *cs = strrchr(pmic.chargeStatus, ':');
+    cs = cs ? cs + 1 : pmic.chargeStatus;
+    while (*cs == ' ') cs++;
+    cJSON_AddStringToObject(root, "charge_status", cs);
+    cJSON_AddBoolToObject(root, "low_battery", (pct >= 0 && pct < 10));
     cJSON *mq = cJSON_CreateObject();
     cJSON_AddBoolToObject(mq, "enabled",   mqtt_ha_enabled());
     cJSON_AddStringToObject(mq, "host",     mqtt_ha_host());

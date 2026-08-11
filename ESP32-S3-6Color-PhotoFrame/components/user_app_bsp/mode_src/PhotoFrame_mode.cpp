@@ -18,8 +18,16 @@
 #include "wifi_manager.h"
 #include "nvs_manager.h"
 #include "mqtt_ha.h"
+#include "power_bsp.h"
 
 static const char *TAG = "photoframe";
+
+// 低电量阈值：<ENTER 进入电量页暂停轮播，≥EXIT 恢复（回滞防反复切换）
+#define LOW_BATTERY_ENTER  10
+#define LOW_BATTERY_EXIT   15
+
+static bool low_battery_active = false;
+static bool battery_page_dirty = false;
 
 // Shared with photo_web_server.cpp
 uint32_t photo_img_count = 0;
@@ -82,6 +90,49 @@ extern "C" void photo_persist_settings(void)
     nvs_manager_set_str("photoframe", "interval", buf);
 }
 
+/* ---- 中文电量页（BOOT 双击 / 低电量自动显示共用）；返回是否成功上屏 ---- */
+extern "C" bool photo_show_battery_page(bool low)
+{
+    if (pdTRUE != xSemaphoreTake(epaper_gui_semapHandle, 2000)) return false;
+
+    PmicRegisterConfig pmic = Custom_PmicGetBatteryInfo();
+    int mv  = Custom_PmicGetBatteryVoltage();
+    int pct = Custom_PmicGetBatteryPercent();
+
+    ePaperDisplay.EPD_DispClear(ColorWhite);
+    int y = 150;
+    if (low) {
+        ePaperDisplay.EPD_DrawStringCN(250, y, "低电量 请充电", &FontBatteryCN, ColorRed, ColorWhite);
+        y += 55;
+    }
+
+    const char *chg = "充电状态：未充电";
+    if (strstr(pmic.isCharging, "Charging") && !strstr(pmic.isCharging, "Not Charging"))
+        chg = "充电状态：充电中";
+
+    const char *stage = "充电阶段：未充电";
+    if      (strstr(pmic.chargeStatus, "Tri"))            stage = "充电阶段：涓流充电";
+    else if (strstr(pmic.chargeStatus, "Pre"))            stage = "充电阶段：预充电";
+    else if (strstr(pmic.chargeStatus, "Constant_Charge")) stage = "充电阶段：恒流充电";
+    else if (strstr(pmic.chargeStatus, "Constant_Voltage"))stage = "充电阶段：恒压充电";
+    else if (strstr(pmic.chargeStatus, "Done"))            stage = "充电阶段：已充满";
+
+    char volt[32], pct_str[32];
+    snprintf(volt, sizeof(volt), "电池电压：%dmV", mv);
+    snprintf(pct_str, sizeof(pct_str), "电池电量：%d%%", pct);
+
+    ePaperDisplay.EPD_DrawStringCN(200, y,      chg,     &FontBatteryCN, ColorBlack, ColorWhite);
+    ePaperDisplay.EPD_DrawStringCN(200, y + 40, stage,   &FontBatteryCN, ColorBlack, ColorWhite);
+    ePaperDisplay.EPD_DrawStringCN(200, y + 80, volt,    &FontBatteryCN, ColorBlack, ColorWhite);
+    ePaperDisplay.EPD_DrawStringCN(200, y + 120, pct_str, &FontBatteryCN, ColorBlack, ColorWhite);
+    ePaperDisplay.Set_Rotation(2);   // 180°，与横屏图片一致（图片加载 BMP 时也会设 2/3）
+    ePaperDisplay.EPD_Display();
+    ePaperDisplay.Set_Rotation(0);   // 恢复默认，后续图片显示时会自行设置
+
+    xSemaphoreGive(epaper_gui_semapHandle);
+    return true;
+}
+
 /* ---- ePaper GUI Task ---- */
 static void gui_task(void *arg)
 {
@@ -103,6 +154,7 @@ static void gui_task(void *arg)
                 ePaperDisplay.EPD_Display();
             }
         }
+        battery_page_dirty = true;   // 低电量态下被图片覆盖后，下个周期重新显示电量页
 
         xSemaphoreGive(epaper_gui_semapHandle);
         Green_led_arg = 0;
@@ -130,6 +182,22 @@ static void slideshow_task(void *arg)
     int tick_minute = 0;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(60 * 1000));
+
+        /* 低电量检测（独立于轮播开关）：<10% 暂停轮播显示电量页，充电≥15% 恢复 */
+        int pct = Custom_PmicGetBatteryPercent();
+        if (pct >= 0 && pct < LOW_BATTERY_ENTER && !low_battery_active) {
+            low_battery_active = true;
+            photo_running = false;   // 直接改全局，不走 photo_set_running（避免写 NVS）
+            battery_page_dirty = false;
+            if (!photo_show_battery_page(true)) battery_page_dirty = true;   // 上屏失败则下周期重试
+        } else if (low_battery_active && pct >= LOW_BATTERY_EXIT) {
+            low_battery_active = false;
+            photo_running = true;
+            xEventGroupSetBits(epaper_groups, set_bit_button(0));   // 恢复轮播，覆盖电量页
+        } else if (low_battery_active && battery_page_dirty) {
+            if (photo_show_battery_page(true)) battery_page_dirty = false;   // 被切图覆盖后重显
+        }
+
         if (!photo_running || photo_img_count == 0) { tick_minute = 0; continue; }
         if (is_sleep_time()) { tick_minute = 0; continue; }
         tick_minute++;
