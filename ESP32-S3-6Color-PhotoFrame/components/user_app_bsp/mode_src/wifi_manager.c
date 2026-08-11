@@ -15,39 +15,56 @@ static bool ap_active = false;
 static bool sta_configured = false;
 static int sta_retry_count = 0;
 static bool in_scan = false;
+static bool connecting = false;
 
 static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     if (base == WIFI_EVENT) {
         if (id == WIFI_EVENT_STA_START) {
-            if (sta_configured) esp_wifi_connect();
+            if (sta_configured) {
+                connecting = true;
+                esp_wifi_connect();
+            }
         } else if (id == WIFI_EVENT_STA_DISCONNECTED) {
+            wifi_event_sta_disconnected_t *ev = (wifi_event_sta_disconnected_t *)data;
             if (in_scan) return;
             if (!sta_configured) return;
+            connecting = false;
             connected = false;
             sta_retry_count++;
+            ESP_LOGW(TAG, "WiFi 断开 (reason=%u), 已尝试 %d/3", ev->reason, sta_retry_count);
             if (sta_retry_count >= 3) {
                 sta_retry_count = 0;
                 if (!ap_active) {
-                    ESP_LOGW(TAG, "WiFi 连接失败 3 次，启动 AP 配网");
+                    ESP_LOGW(TAG, "连续失败 3 次，启动 AP 配网（STA 后台持续重连）");
                     wifi_manager_start_ap();
-                    return;
                 }
-                ESP_LOGW(TAG, "WiFi 断开，30秒后重试...");
-                vTaskDelay(pdMS_TO_TICKS(30000));
-                esp_wifi_connect();
-            } else {
-                ESP_LOGW(TAG, "WiFi 断开，重连中 (%d/3)...", sta_retry_count);
-                vTaskDelay(pdMS_TO_TICKS(5000));
-                esp_wifi_connect();
             }
         }
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *ev = (ip_event_got_ip_t *)data;
         ESP_LOGI(TAG, "已获取 IP: " IPSTR, IP2STR(&ev->ip_info.ip));
         connected = true;
+        connecting = false;
         sta_retry_count = 0;
         wifi_manager_stop_ap();
+    }
+}
+
+/* 独立重连监控：事件回调内不允许阻塞事件循环，断线后的重连全部交给此任务，
+   即使设备进了 AP 配网模式，STA 也会持续尝试连接，路由器恢复后自动回连。 */
+static void wifi_monitor_task(void *arg)
+{
+    TickType_t last = xTaskGetTickCount();
+    for (;;) {
+        /* AP 配网模式下间隔拉长，避免长时间掉线刷屏 */
+        TickType_t interval = ap_active ? pdMS_TO_TICKS(30000) : pdMS_TO_TICKS(10000);
+        vTaskDelayUntil(&last, interval);
+        if (sta_configured && !connected && !connecting && !in_scan) {
+            ESP_LOGW(TAG, "WiFi 未连接，自动重连...");
+            connecting = true;
+            esp_wifi_connect();
+        }
     }
 }
 
@@ -68,6 +85,7 @@ void wifi_manager_init(void)
                      &wifi_event_handler, NULL, NULL));
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_NULL));
+    xTaskCreate(wifi_monitor_task, "wifi_mon", 2048, NULL, 2, NULL);
     ESP_LOGI(TAG, "WiFi 初始化完成");
 }
 
@@ -92,6 +110,7 @@ bool wifi_manager_connect(void)
     esp_wifi_set_config(WIFI_IF_STA, &cfg);
     esp_wifi_start();
     sta_configured = true;
+    connecting = true;
 
     ESP_LOGI(TAG, "正在连接 %s...", ssid);
     return true;
@@ -111,11 +130,13 @@ static bool apply_credentials(void)
 
     if (ap_active) {
         sta_configured = true;
+        connecting = true;
         esp_wifi_connect();
     } else {
         esp_wifi_set_mode(WIFI_MODE_STA);
         esp_wifi_start();
         sta_configured = true;
+        connecting = true;
     }
 
     ESP_LOGI(TAG, "正在连接 %s...", ssid);
@@ -171,6 +192,7 @@ void wifi_manager_disconnect(void)
 {
     esp_wifi_disconnect();
     connected = false;
+    connecting = false;
 }
 
 void wifi_manager_scan(char (*ssids)[33], int max, int *count)
@@ -238,6 +260,7 @@ void wifi_manager_reset(void)
     wifi_manager_clear_credentials();
     esp_wifi_disconnect();
     connected = false;
+    connecting = false;
     sta_retry_count = 0;
     esp_wifi_set_mode(WIFI_MODE_NULL);
     esp_wifi_stop();

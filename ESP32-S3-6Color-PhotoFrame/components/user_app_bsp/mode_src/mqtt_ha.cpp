@@ -238,10 +238,21 @@ static void mqtt_client_start(void)
 
 static void mqtt_ha_task(void *arg)
 {
-    mqtt_client_start();
+    int pub_tick = 0;
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(30000));
-        if (wifi_manager_is_connected() && s_client && s_connected) {
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        bool wifi_ok = wifi_manager_is_connected();
+        if (wifi_ok && !s_client) {
+            mqtt_client_start();   // WiFi 就绪后才创建 MQTT 客户端，避免开机无网络时反复报错
+        } else if (!wifi_ok && s_client) {
+            ESP_LOGW(TAG, "WiFi 断开，停止 MQTT 客户端，WiFi 恢复后自动重连");
+            esp_mqtt_client_stop(s_client);
+            esp_mqtt_client_destroy(s_client);
+            s_client = NULL;
+            s_connected = false;
+        }
+        if (wifi_ok && s_client && s_connected && (++pub_tick >= 10)) {
+            pub_tick = 0;   // 3s * 10 = 30s 发布一次状态
             mqtt_publish_state();
         }
     }
