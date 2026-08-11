@@ -29,6 +29,26 @@ DB_PATH = Path(str(getattr(cfg, "DB_PATH", "./photos.db") or "./photos.db").stri
 if not DB_PATH.is_absolute():
     DB_PATH = (ROOT_DIR / DB_PATH).resolve()
 
+
+def _ensure_schema():
+    """确保 photo_scores 表含最新列。analyze 可能未跑过，旧库直接 serve 也能工作。"""
+    if not DB_PATH.exists():
+        return
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        for col in ("funny_score REAL", "depth_score REAL", "art_score REAL"):
+            try:
+                conn.execute(f"ALTER TABLE photo_scores ADD COLUMN {col}")
+            except sqlite3.OperationalError:
+                pass
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+_ensure_schema()
+
 IMAGE_DIR = Path(str(getattr(cfg, "IMAGE_DIR", "") or "").strip().strip('"\'')).expanduser()
 if not IMAGE_DIR.is_absolute():
     IMAGE_DIR = (ROOT_DIR / IMAGE_DIR).resolve()
@@ -136,8 +156,8 @@ def _make_image_url(path_str: str) -> str:
 # --------------------------
 
 
-def load_rows(page: int = 1, page_size: int = REVIEW_PAGE_SIZE, md: str = "", sort: str = "memory"):
-    """分页读取 review 数据。支持按 MM-DD 过滤与排序。返回 (rows, total_count)."""
+def load_rows(page: int = 1, page_size: int = REVIEW_PAGE_SIZE, md: str = "", sort: str = "memory", ptype: str = ""):
+    """分页读取 review 数据。支持按 MM-DD / type 过滤与排序。返回 (rows, total_count)."""
     if not DB_PATH.exists():
         raise SystemExit(f"找不到数据库文件: {DB_PATH}")
 
@@ -156,19 +176,22 @@ def load_rows(page: int = 1, page_size: int = REVIEW_PAGE_SIZE, md: str = "", so
     dt_expr = "json_extract(exif_json, '$.datetime')"
     md_expr = f"(substr({dt_expr}, 6, 2) || '-' || substr({dt_expr}, 9, 2))"
 
-    where_sql = ""
+    conds: list[str] = []
     params: list[object] = []
 
     md = (md or "").strip()
     if md and len(md) == 5 and md[2] == "-":
-        where_sql = f"WHERE {dt_expr} IS NOT NULL AND {md_expr} = ?"
+        conds.append(f"{dt_expr} IS NOT NULL AND {md_expr} = ?")
         params.append(md)
+    ptype = (ptype or "").strip()
+    if ptype:
+        conds.append("type LIKE ?")   # type 为 / 分隔多值，用 LIKE 命中任意位置
+        params.append(f"%{ptype}%")
+
+    where_sql = f"WHERE {' AND '.join(conds)}" if conds else ""
 
     # total_count 也要跟随过滤
-    if where_sql:
-        total_count = c.execute(f"SELECT COUNT(1) FROM photo_scores {where_sql}", params).fetchone()[0]
-    else:
-        total_count = c.execute("SELECT COUNT(1) FROM photo_scores").fetchone()[0]
+    total_count = c.execute(f"SELECT COUNT(1) FROM photo_scores {where_sql}", params).fetchone()[0]
 
     # 排序
     sort = (sort or "memory").strip()
@@ -189,6 +212,9 @@ def load_rows(page: int = 1, page_size: int = REVIEW_PAGE_SIZE, md: str = "", so
                type,
                memory_score,
                beauty_score,
+               funny_score,
+               depth_score,
+               art_score,
                reason,
                exif_json,
                width,
@@ -272,6 +298,9 @@ def load_sim_rows_for_dates(dates: list[str]):
                type,
                memory_score,
                beauty_score,
+               funny_score,
+               depth_score,
+               art_score,
                reason,
                side_caption,
                exif_json,
@@ -299,7 +328,7 @@ def load_photo_full_row(abs_path: str):
     conn = sqlite3.connect(DB_PATH)
     row = conn.execute(
         """
-        SELECT path, caption, type, memory_score, beauty_score, reason,
+        SELECT path, caption, type, memory_score, beauty_score, funny_score, depth_score, art_score, reason,
                side_caption, exif_json, width, height, orientation, used_at,
                exif_gps_lat, exif_gps_lon, exif_city
         FROM photo_scores
@@ -425,10 +454,10 @@ def extract_date_from_exif(exif_json: str | None) -> str:
 # HTML builders
 # --------------------------
 
-def build_html(rows, page: int, page_size: int, total_count: int):
+def build_html(rows, page: int, page_size: int, total_count: int, sel_type: str = ""):
     items_html = []
 
-    for path, caption, ptype, m_score, b_score, reason, exif_json, width, height, orientation, used_at, side_caption in rows:
+    for path, caption, ptype, m_score, b_score, funny, depth, art, reason, exif_json, width, height, orientation, used_at, side_caption in rows:
         safe_caption = html.escape(caption or "").replace("\n", "<br>")
         safe_side = html.escape(side_caption or "").replace("\n", "<br>")
         safe_type = html.escape(ptype or "")
@@ -458,12 +487,19 @@ def build_html(rows, page: int, page_size: int, total_count: int):
             continue
 
         score_html = ""
-        if m_score is not None or b_score is not None:
+        if m_score is not None or b_score is not None or funny is not None or depth is not None or art is not None:
             parts = []
             if m_score is not None:
                 parts.append(f"回忆度: {m_score:.1f}")
             if b_score is not None:
                 parts.append(f"美观度: {b_score:.1f}")
+            ptype_str = ptype or ""
+            if ("表情包" in ptype_str or "梗图" in ptype_str) and funny is not None:
+                parts.append(f"有趣: {funny:.1f}")
+            if "梗图" in ptype_str and depth is not None:
+                parts.append(f"深度: {depth:.1f}")
+            if "二次元插画" in ptype_str and art is not None:
+                parts.append(f"艺术: {art:.1f}")
             score_line = " / ".join(parts)
             score_html = f'<div class="score">{score_line}</div>'
 
@@ -476,7 +512,10 @@ def build_html(rows, page: int, page_size: int, total_count: int):
              data-date="{safe_date}"
              data-md="{safe_md}"
              data-memory="{m_score if m_score is not None else ''}"
-             data-beauty="{b_score if b_score is not None else ''}">
+             data-beauty="{b_score if b_score is not None else ''}"
+             data-funny="{funny if funny is not None else ''}"
+             data-depth="{depth if depth is not None else ''}"
+             data-art="{art if art is not None else ''}">
             <div class="img-wrap">
                 <a class="img-link" href="/sim?img={html.escape(img_uri)}" title="打开该照片的模拟器" onclick="window.stop();">
                     <img src="{img_uri}" loading="lazy">
@@ -507,6 +546,7 @@ def build_html(rows, page: int, page_size: int, total_count: int):
     md_q = (request.args.get("md", "") or "").strip()
     sort_q = (request.args.get("sort", "") or "memory").strip() or "memory"
     md_hint = f" · 筛选日期 {html.escape(md_q)}" if (md_q and len(md_q) == 5) else ""
+    type_q = (sel_type or "").strip()
 
     html_str = f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -757,6 +797,27 @@ def build_html(rows, page: int, page_size: int, total_count: int):
           <option value="time_old">按时间（旧→新）</option>
         </select>
       </label>
+      <label>
+        类型：
+        <select id="typeFilter">
+          <option value="">全部</option>
+          <option value="人物">人物</option>
+          <option value="孩子">孩子</option>
+          <option value="猫咪">猫咪</option>
+          <option value="家庭">家庭</option>
+          <option value="旅行">旅行</option>
+          <option value="风景">风景</option>
+          <option value="美食">美食</option>
+          <option value="宠物">宠物</option>
+          <option value="日常">日常</option>
+          <option value="文档">文档</option>
+          <option value="杂物">杂物</option>
+          <option value="表情包">表情包</option>
+          <option value="梗图">梗图</option>
+          <option value="二次元插画">二次元插画</option>
+          <option value="其他">其他</option>
+        </select>
+      </label>
       <button type="button" id="randomDateBtn">随机一天</button>
       <button type="button" id="homeBtn">回到首页</button>
     </div>
@@ -815,13 +876,17 @@ def build_html(rows, page: int, page_size: int, total_count: int):
         const md = (url.searchParams.get('md') || '').trim();
         const sort = (url.searchParams.get('sort') || '').trim() || 'memory';
         const page = parseInt(url.searchParams.get('page') || '1', 10) || 1;
-        return {{ url, md, sort, page }};
+        const type = (url.searchParams.get('type') || '').trim();
+        return {{ url, md, sort, page, type }};
       }}
 
       function setSelectsFromUrl() {{
         const p = getParams();
         // sort
         if (sortSelect) sortSelect.value = p.sort;
+        // type
+        const typeSel = document.getElementById('typeFilter');
+        if (typeSel) typeSel.value = p.type;
         // md -> month/day
         if (p.md && p.md.length === 5 && p.md.indexOf('-') === 2) {{
           const parts = p.md.split('-');
@@ -837,20 +902,22 @@ def build_html(rows, page: int, page_size: int, total_count: int):
         }}
       }}
 
-      function buildReviewUrl(md, sort, page) {{
+      function buildReviewUrl(md, sort, page, type) {{
         const url = new URL(window.location.href);
         url.pathname = '/review';
         if (md && md.length === 5 && md.indexOf('-') === 2) url.searchParams.set('md', md);
         else url.searchParams.delete('md');
         if (sort) url.searchParams.set('sort', sort);
         else url.searchParams.delete('sort');
+        if (type) url.searchParams.set('type', type);
+        else url.searchParams.delete('type');
         url.searchParams.set('page', String(page || 1));
         return url.toString();
       }}
 
       function goPage(p) {{
         const params = getParams();
-        navigateTo(buildReviewUrl(params.md, params.sort, p));
+        navigateTo(buildReviewUrl(params.md, params.sort, p, params.type));
       }}
 
       function goHome() {{
@@ -874,7 +941,7 @@ def build_html(rows, page: int, page_size: int, total_count: int):
           const idx = Math.floor(Math.random() * arr.length);
           const md = String(arr[idx] || '').trim();
           const params = getParams();
-          navigateTo(buildReviewUrl(md, params.sort || 'memory', 1));
+          navigateTo(buildReviewUrl(md, params.sort || 'memory', 1, params.type));
         }} catch (e) {{
           if (statusLine) statusLine.textContent = '随机失败：' + e;
         }}
@@ -884,14 +951,15 @@ def build_html(rows, page: int, page_size: int, total_count: int):
         const mVal = (monthSelect && monthSelect.value) ? monthSelect.value : '';
         const dVal = (daySelect && daySelect.value) ? daySelect.value : '';
         const sortBy = (sortSelect && sortSelect.value) ? sortSelect.value : 'memory';
+        const params = getParams();
 
         if (!mVal && !dVal) {{
-          navigateTo(buildReviewUrl('', sortBy, 1));
+          navigateTo(buildReviewUrl('', sortBy, 1, params.type));
           return;
         }}
         if (mVal && dVal) {{
           const md = mVal + '-' + dVal;
-          navigateTo(buildReviewUrl(md, sortBy, 1));
+          navigateTo(buildReviewUrl(md, sortBy, 1, params.type));
           return;
         }}
         // 只选了一个，不跳转，避免生成无意义的 md
@@ -900,7 +968,14 @@ def build_html(rows, page: int, page_size: int, total_count: int):
       function onSortChange() {{
         const params = getParams();
         const sortBy = (sortSelect && sortSelect.value) ? sortSelect.value : 'memory';
-        navigateTo(buildReviewUrl(params.md, sortBy, 1));
+        navigateTo(buildReviewUrl(params.md, sortBy, 1, params.type));
+      }}
+
+      function onTypeChange() {{
+        const params = getParams();
+        const typeSel = document.getElementById('typeFilter');
+        const typeVal = (typeSel && typeSel.value) ? typeSel.value : '';
+        navigateTo(buildReviewUrl(params.md, params.sort, 1, typeVal));
       }}
 
       // 分页按钮
@@ -924,6 +999,8 @@ def build_html(rows, page: int, page_size: int, total_count: int):
       if (monthSelect) monthSelect.addEventListener('change', onMonthDayChange);
       if (daySelect) daySelect.addEventListener('change', onMonthDayChange);
       if (sortSelect) sortSelect.addEventListener('change', onSortChange);
+      const typeSel = document.getElementById('typeFilter');
+      if (typeSel) typeSel.addEventListener('change', onTypeChange);
       if (randomBtn) randomBtn.addEventListener('click', pickRandomDate);
       if (homeBtn) homeBtn.addEventListener('click', goHome);
 
@@ -955,9 +1032,9 @@ def build_simulator_html(sim_rows, selected_img: str = ""):
     info: dict = {}
     for row in sim_rows:
         try:
-            (path, caption, ptype, memory_score, beauty_score, reason,
+            (path, caption, ptype, memory_score, beauty_score, funny_score, depth_score, art_score, reason,
              side_caption, exif_json, width, height, orientation, used_at,
-             gps_lat, gps_lon, exif_city) = row[:15]
+             gps_lat, gps_lon, exif_city) = row[:18]
         except Exception:
             continue
         img_uri = _make_image_url(str(path))
@@ -967,6 +1044,9 @@ def build_simulator_html(sim_rows, selected_img: str = ""):
             "date": extract_date_from_exif(exif_json),
             "memory": float(memory_score) if memory_score is not None else None,
             "beauty": float(beauty_score) if beauty_score is not None else None,
+            "funny": float(funny_score) if funny_score is not None else None,
+            "depth": float(depth_score) if depth_score is not None else None,
+            "art": float(art_score) if art_score is not None else None,
             "side": side_caption or "",
             "caption": caption or "",
             "type": ptype or "",
@@ -1015,6 +1095,9 @@ h1{font-size:25px;margin-bottom:8px;color:#e6edf3}
 .sbar-fill{height:100%;border-radius:8px}
 .sbar-fill.mem{background:linear-gradient(90deg,#6fd6ff,#9cffd6)}
 .sbar-fill.bea{background:linear-gradient(90deg,#ffd36f,#ff9f6f)}
+.sbar-fill.fun{background:linear-gradient(90deg,#ff6f9f,#ffb86f)}
+.sbar-fill.dep{background:linear-gradient(90deg,#a78bfa,#7dd3fc)}
+.sbar-fill.art{background:linear-gradient(90deg,#34d399,#5eead4)}
 .sval{min-width:42px;text-align:right;color:#e6edf3}
 .sval2{flex:1;color:#c9d1d9;word-break:break-all}
 .bar{display:flex;gap:10px;align-items:center;padding:10px 14px;background:#161b22;border:1px solid #30363d;border-radius:10px;margin-bottom:14px}
@@ -1231,6 +1314,10 @@ function renderInfo(){
   let h='';
   if(photoInfo.memory!=null)h+=scoreBar('回忆分',photoInfo.memory,'mem');
   if(photoInfo.beauty!=null)h+=scoreBar('美观分',photoInfo.beauty,'bea');
+  const tp=photoInfo.type||'';
+  if((tp.indexOf('表情包')>=0||tp.indexOf('梗图')>=0)&&photoInfo.funny!=null)h+=scoreBar('有趣',photoInfo.funny,'fun');
+  if(tp.indexOf('梗图')>=0&&photoInfo.depth!=null)h+=scoreBar('深度',photoInfo.depth,'dep');
+  if(tp.indexOf('二次元插画')>=0&&photoInfo.art!=null)h+=scoreBar('艺术',photoInfo.art,'art');
   const rows=[];
   if(photoInfo.side)rows.push('<div class="srow"><span class="skey">文案</span><span class="sval2">'+esc(photoInfo.side)+'</span></div>');
   if(photoInfo.type)rows.push('<div class="srow"><span class="skey">类型</span><span class="sval2">'+esc(photoInfo.type)+'</span></div>');
@@ -1303,8 +1390,9 @@ def review():
 
     md = (request.args.get('md', '') or '').strip()
     sort = (request.args.get('sort', '') or 'memory').strip() or 'memory'
+    ptype = (request.args.get('type', '') or '').strip()
 
-    rows, total_count = load_rows(page=page, page_size=REVIEW_PAGE_SIZE, md=md, sort=sort)
+    rows, total_count = load_rows(page=page, page_size=REVIEW_PAGE_SIZE, md=md, sort=sort, ptype=ptype)
     if not rows:
         return Response(
             "数据库里没有可展示的数据。请先运行你的分析脚本生成评分与文案。",
@@ -1312,7 +1400,7 @@ def review():
             mimetype="text/plain; charset=utf-8",
         )
 
-    html_str = build_html(rows, page=page, page_size=REVIEW_PAGE_SIZE, total_count=total_count)
+    html_str = build_html(rows, page=page, page_size=REVIEW_PAGE_SIZE, total_count=total_count, sel_type=ptype)
     return Response(html_str, mimetype="text/html; charset=utf-8")
 
 

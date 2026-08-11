@@ -378,6 +378,12 @@ def ensure_table(conn: sqlite3.Connection) -> None:
         cur.execute("ALTER TABLE photo_scores ADD COLUMN exif_city TEXT")
     except sqlite3.OperationalError:
         pass
+    # 类型专属评分（表情包/梗图/二次元插画）：有趣度 / 深度 / 艺术度
+    for _col in ("funny_score REAL", "depth_score REAL", "art_score REAL"):
+        try:
+            cur.execute(f"ALTER TABLE photo_scores ADD COLUMN {_col}")
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
 
 # 生成一句话文案
@@ -964,7 +970,7 @@ def call_vlm(image_path: Path) -> dict:
         "你是一个“个人相册照片评估助手”，擅长理解真实照片的内容，并从回忆价值和美观角度打分。\n"
         "你会收到一张照片（以 base64 形式提供），你的任务是：\n"
         "1）用中文详细描述照片内容（80~200 字），\n"
-        "2）判断照片的大致类型：人物/孩子/猫咪/家庭/旅行/风景/美食/宠物/日常/文档/杂物/其他，一张照片可以有不止一个类型。\n"
+        "2）判断照片的大致类型：人物/孩子/猫咪/家庭/旅行/风景/美食/宠物/日常/文档/杂物/表情包/梗图/二次元插画/其他；其中“表情包”指单图或动图配简短情绪文字、快速表达情绪，“梗图”指多格漫画或有完整梗/叙事的图片；一张照片可以有不止一个类型。\n"
         "3）给出 0~100 的“值得回忆度” memory_score（精确到一位小数），\n"
         "4）给出 0~100 的“美观程度” beauty_score（精确到一位小数），\n"
         "5）用简短中文 reason 解释原因（不超过 40 字）。\n\n"
@@ -996,7 +1002,12 @@ def call_vlm(image_path: Path) -> dict:
         
         "【美观分（beauty_score）评分方法】\n"
         "美观分只评价视觉：构图、光线、清晰度、色彩、主体突出。\n"
-        "不要被“孩子/猫/旅行”主题绑架美观分：主题不等于好看。\n"
+        "不要被“孩子/猫/旅行”主题绑架美观分：主题不等于好看。\n\n"
+
+        "【类型专属评分（仅对相关类型评分，其他类型不评/省略该字段）】\n"
+        "- funny_score（有趣度 0-100，精确到 1 位小数）：表情包、梗图必评，评价搞笑/沙雕/幽默程度。\n"
+        "- depth_score（深度/立意 0-100，精确到 1 位小数）：梗图必评，评价讽刺、反转、哲理、立意深度。\n"
+        "- art_score（艺术完成度 0-100，精确到 1 位小数）：二次元插画必评，评价画工、构图、配色、精细度。\n\n"
 
         "请严格只输出 JSON，格式如下：\n"
         "{\n"
@@ -1004,6 +1015,9 @@ def call_vlm(image_path: Path) -> dict:
         "  \"type\": \"人物/家庭/旅行/…… 可以带多个type\",\n"
         "  \"memory_score\": 0.0-100.0 的数字, 精确到 1 位小数\n"
         "  \"beauty_score\": 0.0-100.0 的数字, 精确到 1 位小数\n"
+        "  \"funny_score\": 0.0-100.0 的数字（不适用时省略）\n"
+        "  \"depth_score\": 0.0-100.0 的数字（不适用时省略）\n"
+        "  \"art_score\": 0.0-100.0 的数字（不适用时省略）\n"
         "  \"reason\": \"不超过 60 字的中文理由\"\n"
         "}\n"
         "不要输出任何多余文字，不要加注释。"
@@ -1081,6 +1095,14 @@ def _process_one_photo(path: Path, city_resolver) -> dict | None:
         beauty_score = float(result.get("beauty_score", 0.0))
     except Exception:
         beauty_score = 0.0
+    def _to_score(v):
+        try:
+            return float(v) if v is not None else None
+        except Exception:
+            return None
+    funny_score = _to_score(result.get("funny_score"))
+    depth_score = _to_score(result.get("depth_score"))
+    art_score   = _to_score(result.get("art_score"))
     reason = str(result.get("reason", "")).strip()
 
     side_caption = generate_side_caption(path)
@@ -1131,6 +1153,9 @@ def _process_one_photo(path: Path, city_resolver) -> dict | None:
         "type": ptype,
         "memory_score": memory_score,
         "beauty_score": beauty_score,
+        "funny_score": funny_score,
+        "depth_score": depth_score,
+        "art_score": art_score,
         "reason": reason,
         "width": width,
         "height": height,
@@ -1158,13 +1183,13 @@ def _save_result_to_db(cur, conn, rec: dict):
     cur.execute(
         """
         INSERT OR REPLACE INTO photo_scores
-        (path, caption, type, memory_score, beauty_score, reason,
+        (path, caption, type, memory_score, beauty_score, funny_score, depth_score, art_score, reason,
          width, height, orientation, used_at,
          exif_json, raw_json,
          exif_datetime, exif_make, exif_model,
          exif_iso, exif_exposure_time, exif_f_number, exif_focal_length,
          exif_gps_lat, exif_gps_lon, exif_gps_alt, side_caption, exif_city)
-        VALUES (?, ?, ?, ?, ?, ?,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, COALESCE((SELECT used_at FROM photo_scores WHERE path = ?), NULL),
                 ?, ?,
                 ?, ?, ?,
@@ -1177,6 +1202,9 @@ def _save_result_to_db(cur, conn, rec: dict):
             rec["type"],
             rec["memory_score"],
             rec["beauty_score"],
+            rec["funny_score"],
+            rec["depth_score"],
+            rec["art_score"],
             rec["reason"],
             rec["width"],
             rec["height"],
@@ -1206,6 +1234,12 @@ def _print_result(rec: dict):
     print(f"  类型    ：{rec['type']}")
     print(f"  回忆分  ：{rec['memory_score']:.1f}")
     print(f"  美观分  ：{rec['beauty_score']:.1f}")
+    if rec.get("funny_score") is not None:
+        print(f"  有趣分  ：{rec['funny_score']:.1f}")
+    if rec.get("depth_score") is not None:
+        print(f"  深度分  ：{rec['depth_score']:.1f}")
+    if rec.get("art_score") is not None:
+        print(f"  艺术分  ：{rec['art_score']:.1f}")
     if rec["side_caption"]:
         print(f"  一句话文案：{rec['side_caption']}")
     else:
