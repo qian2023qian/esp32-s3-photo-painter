@@ -197,6 +197,12 @@ def load_rows(page: int = 1, page_size: int = REVIEW_PAGE_SIZE, md: str = "", so
     sort = (sort or "memory").strip()
     if sort == "beauty":
         order_sql = "ORDER BY COALESCE(beauty_score, -1) DESC, COALESCE(memory_score, -1) DESC, path"
+    elif sort == "funny":
+        order_sql = "ORDER BY COALESCE(funny_score, -1) DESC, COALESCE(depth_score, -1) DESC, path"
+    elif sort == "depth":
+        order_sql = "ORDER BY COALESCE(depth_score, -1) DESC, COALESCE(funny_score, -1) DESC, path"
+    elif sort == "art":
+        order_sql = "ORDER BY COALESCE(art_score, -1) DESC, path"
     elif sort == "time_new":
         # 直接按 datetime 字符串排序（固定格式下可按字典序比较）；NULL 放最后
         order_sql = f"ORDER BY ({dt_expr} IS NULL) ASC, {dt_expr} DESC, path"
@@ -793,6 +799,9 @@ def build_html(rows, page: int, page_size: int, total_count: int, sel_type: str 
         <select id="sortBy">
           <option value="memory">按回忆度</option>
           <option value="beauty">按美观度</option>
+          <option value="funny">按有趣度</option>
+          <option value="depth">按深度</option>
+          <option value="art">按艺术度</option>
           <option value="time_new">按时间（新→旧）</option>
           <option value="time_old">按时间（旧→新）</option>
         </select>
@@ -874,9 +883,11 @@ def build_html(rows, page: int, page_size: int, total_count: int, sel_type: str 
       function getParams() {{
         const url = new URL(window.location.href);
         const md = (url.searchParams.get('md') || '').trim();
-        const sort = (url.searchParams.get('sort') || '').trim() || 'memory';
         const page = parseInt(url.searchParams.get('page') || '1', 10) || 1;
         const type = (url.searchParams.get('type') || '').trim();
+        // URL 未显式指定 sort 时按类型联动默认（与后端 /review 一致）
+        let sort = (url.searchParams.get('sort') || '').trim();
+        if (!sort) sort = (type==='表情包'||type==='梗图') ? 'funny' : (type==='二次元插画' ? 'art' : 'memory');
         return {{ url, md, sort, page, type }};
       }}
 
@@ -975,7 +986,13 @@ def build_html(rows, page: int, page_size: int, total_count: int, sel_type: str 
         const params = getParams();
         const typeSel = document.getElementById('typeFilter');
         const typeVal = (typeSel && typeSel.value) ? typeSel.value : '';
-        navigateTo(buildReviewUrl(params.md, params.sort, 1, typeVal));
+        // URL 未显式选排序时，按新类型联动默认排序
+        const url = new URL(window.location.href);
+        let sort = params.sort;
+        if (!url.searchParams.get('sort')) {{
+          sort = (typeVal==='表情包'||typeVal==='梗图') ? 'funny' : (typeVal==='二次元插画' ? 'art' : 'memory');
+        }}
+        navigateTo(buildReviewUrl(params.md, sort, 1, typeVal));
       }}
 
       // 分页按钮
@@ -1389,8 +1406,13 @@ def review():
         page = 1
 
     md = (request.args.get('md', '') or '').strip()
-    sort = (request.args.get('sort', '') or 'memory').strip() or 'memory'
     ptype = (request.args.get('type', '') or '').strip()
+    sort_arg = (request.args.get('sort', '') or '').strip()
+    if not sort_arg:
+        # 类型联动：选表情包/梗图默认按有趣度，插画按艺术度，其他按回忆度
+        sort = "funny" if ptype in ("表情包", "梗图") else ("art" if ptype == "二次元插画" else "memory")
+    else:
+        sort = sort_arg
 
     rows, total_count = load_rows(page=page, page_size=REVIEW_PAGE_SIZE, md=md, sort=sort, ptype=ptype)
     if not rows:

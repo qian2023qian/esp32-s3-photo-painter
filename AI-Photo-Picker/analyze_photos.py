@@ -1000,24 +1000,32 @@ def call_vlm(image_path: Path) -> dict:
         "- 裸露、低俗、色情或违反公序良俗的图片。\n\n"
         "- 账单、收据、广告、随手拍的杂物、测试图片、屏幕截图等。\n\n"
         
+        "【评分适用规则】\n"
+        "- 真实生活照片（人物/孩子/家庭/旅行/风景/美食/宠物/日常/文档/杂物等）：评 memory_score 和 beauty_score。\n"
+        "- 网络图/非真实照片（表情包/梗图/二次元插画）：不评 memory_score 和 beauty_score（输出 null），改为评类型专属评分。\n"
+        "- 混合类型按画面主体判断：主体是表情包/梗图/插画则按网络图处理。\n\n"
+
         "【美观分（beauty_score）评分方法】\n"
         "美观分只评价视觉：构图、光线、清晰度、色彩、主体突出。\n"
         "不要被“孩子/猫/旅行”主题绑架美观分：主题不等于好看。\n\n"
 
-        "【类型专属评分（仅对相关类型评分，其他类型不评/省略该字段）】\n"
-        "- funny_score（有趣度 0-100，精确到 1 位小数）：表情包、梗图必评，评价搞笑/沙雕/幽默程度。\n"
-        "- depth_score（深度/立意 0-100，精确到 1 位小数）：梗图必评，评价讽刺、反转、哲理、立意深度。\n"
-        "- art_score（艺术完成度 0-100，精确到 1 位小数）：二次元插画必评，评价画工、构图、配色、精细度。\n\n"
+        "【类型专属评分（仅对表情包/梗图/二次元插画评分，其他类型不评/省略该字段；务必拉开差距，避免普遍 70-90）】\n"
+        "- funny_score（有趣度 0-100，精确到 1 位小数）：表情包、梗图必评，评价搞笑程度、笑点强度、创意、反转、沙雕感。\n"
+        "    区间：完全不好笑/尬/无梗 0-40；普通表情包能会心一笑 50-65；比较搞笑有笑点 65-78；很好笑有创意或反转 78-90；神级好笑（极少数）90+。多数应落 50-78。\n"
+        "- depth_score（深度/立意 0-100，精确到 1 位小数）：梗图必评，评价讽刺、批判、反转、哲理、社会观察、立意深度。\n"
+        "    区间：纯搞笑无深意 0-40；略有讽刺或意味 50-65；明显立意/反转/反讽 65-80；深刻发人深省 80+。多数梗图无深度应集中 0-60。\n"
+        "- art_score（艺术完成度 0-100，精确到 1 位小数）：二次元插画必评，评价完成度、构图、配色、光影、细节精细度。\n"
+        "    区间：粗糙/草稿/比例崩坏 0-45；一般水平 50-70；精致构图配色协调 70-85；精美绝伦（极少数）85+。多数落 50-75。\n\n"
 
         "请严格只输出 JSON，格式如下：\n"
         "{\n"
         "  \"caption\": \"……\",\n"
         "  \"type\": \"人物/家庭/旅行/…… 可以带多个type\",\n"
-        "  \"memory_score\": 0.0-100.0 的数字, 精确到 1 位小数\n"
-        "  \"beauty_score\": 0.0-100.0 的数字, 精确到 1 位小数\n"
-        "  \"funny_score\": 0.0-100.0 的数字（不适用时省略）\n"
-        "  \"depth_score\": 0.0-100.0 的数字（不适用时省略）\n"
-        "  \"art_score\": 0.0-100.0 的数字（不适用时省略）\n"
+        "  \"memory_score\": 0.0-100.0（仅真实照片；网络图输出 null）\n"
+        "  \"beauty_score\": 0.0-100.0（仅真实照片；网络图输出 null）\n"
+        "  \"funny_score\": 0.0-100.0（表情包/梗图必填，否则省略）\n"
+        "  \"depth_score\": 0.0-100.0（梗图必填，否则省略）\n"
+        "  \"art_score\": 0.0-100.0（二次元插画必填，否则省略）\n"
         "  \"reason\": \"不超过 60 字的中文理由\"\n"
         "}\n"
         "不要输出任何多余文字，不要加注释。"
@@ -1087,19 +1095,13 @@ def _process_one_photo(path: Path, city_resolver) -> dict | None:
 
     caption = str(result.get("caption", "")).strip()
     ptype = str(result.get("type", "")).strip()
-    try:
-        memory_score = float(result.get("memory_score", 0.0))
-    except Exception:
-        memory_score = 0.0
-    try:
-        beauty_score = float(result.get("beauty_score", 0.0))
-    except Exception:
-        beauty_score = 0.0
     def _to_score(v):
         try:
-            return float(v) if v is not None else None
+            return float(v) if v is not None else None   # 网络图输出 null -> None
         except Exception:
             return None
+    memory_score = _to_score(result.get("memory_score"))
+    beauty_score = _to_score(result.get("beauty_score"))
     funny_score = _to_score(result.get("funny_score"))
     depth_score = _to_score(result.get("depth_score"))
     art_score   = _to_score(result.get("art_score"))
@@ -1142,7 +1144,7 @@ def _process_one_photo(path: Path, city_resolver) -> dict | None:
 
     lat = exif_info.get("gps_lat")
     lon = exif_info.get("gps_lon")
-    if lat is not None and lon is not None and not in_home(lat, lon):
+    if lat is not None and lon is not None and not in_home(lat, lon) and memory_score is not None:
         memory_score = min(memory_score + 5.0, 100.0)
 
     t_photo_end = time.perf_counter()
@@ -1232,8 +1234,10 @@ def _save_result_to_db(cur, conn, rec: dict):
 def _print_result(rec: dict):
     """打印单张照片处理结果摘要。"""
     print(f"  类型    ：{rec['type']}")
-    print(f"  回忆分  ：{rec['memory_score']:.1f}")
-    print(f"  美观分  ：{rec['beauty_score']:.1f}")
+    if rec.get("memory_score") is not None:
+        print(f"  回忆分  ：{rec['memory_score']:.1f}")
+    if rec.get("beauty_score") is not None:
+        print(f"  美观分  ：{rec['beauty_score']:.1f}")
     if rec.get("funny_score") is not None:
         print(f"  有趣分  ：{rec['funny_score']:.1f}")
     if rec.get("depth_score") is not None:
