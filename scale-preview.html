@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>图片缩放预览</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#c9d1d9;padding:16px;text-align:center}
+h1{font-size:18px;margin-bottom:12px}
+.upload-zone{border:2px dashed #30363d;border-radius:8px;padding:20px;cursor:pointer;margin-bottom:10px;display:inline-block;min-width:260px}
+.upload-zone:hover{border-color:#58a6ff}
+.upload-zone p{color:#8b949e;font-size:13px}
+.controls{margin:8px 0;font-size:13px;color:#8b949e}
+.controls label{cursor:pointer;margin:0 8px}
+.controls input[type=radio]{margin-right:4px}
+.send-bar{margin:10px 0;font-size:13px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
+.send-bar input{width:140px;padding:4px 8px;border-radius:4px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:13px;text-align:center}
+.btn{padding:6px 14px;border:none;border-radius:5px;cursor:pointer;font-size:13px;font-weight:600}
+.btn-green{background:#238636;color:#fff}.btn-green:hover{background:#2ea043}
+.btn-blue{background:#1f6feb;color:#fff}.btn-blue:hover{background:#388bfd}
+.msg{font-size:11px;margin-top:4px}
+.msg-ok{color:#3fb950}.msg-err{color:#f85149}
+.result{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+.panel{background:#161b22;border-radius:10px;padding:12px;text-align:center}
+.panel h3{font-size:13px;color:#8b949e;margin-bottom:6px}
+.panel canvas{border:1px solid #21262d;border-radius:4px;max-width:360px;height:auto}
+.info{font-size:10px;color:#8b949e;margin-top:3px}
+.tag{font-size:10px;padding:2px 6px;border-radius:3px;margin-left:4px}
+.tag-stretch{background:#1f6feb;color:#fff}
+.tag-fit{background:#238636;color:#fff}
+#orig-info{font-size:12px;color:#58a6ff;margin-bottom:4px}
+#mode-info{font-size:12px;color:#3fb950;margin-bottom:8px}
+</style>
+</head>
+<body>
+<h1>智能缩放预览</h1>
+<input type="file" id="file-input" accept="image/*" style="display:none" onchange="loadImg(event)">
+<div class="upload-zone" onclick="document.getElementById('file-input').click()">
+<p>点击选择图片</p>
+</div>
+<div id="orig-info"></div>
+<div class="controls">
+方向：
+<label><input type="radio" name="orient" value="auto" checked onchange="redraw()">自动</label>
+<label><input type="radio" name="orient" value="landscape" onchange="redraw()">横屏 800×480</label>
+<label><input type="radio" name="orient" value="portrait" onchange="redraw()">竖屏 480×800</label>
+</div>
+<div id="mode-info"></div>
+<div class="send-bar">
+<span>ESP32 IP:</span>
+<input id="esp-ip" value="192.168.3.95">
+<button class="btn btn-green" onclick="sendToESP()">发送当前推荐图到屏幕</button>
+</div>
+<div class="msg" id="send-msg"></div>
+<div class="result" id="panels"></div>
+<script>
+const THRESHOLD=0.25;
+const PAPER='#b9c7c9';
+var lastImg=null,autoCanvas=null;
+
+function loadImg(e){
+var f=e.target.files[0];if(!f)return;
+var img=new Image();img.onload=function(){lastImg=img;redraw()};
+img.src=URL.createObjectURL(f)}
+
+function getOrient(img){
+var o=document.querySelector('input[name=orient]:checked').value;
+if(o==='landscape')return{tw:800,th:480};
+if(o==='portrait')return{tw:480,th:800};
+var w=img.naturalWidth,h=img.naturalHeight;
+return w>=h?{tw:800,th:480}:{tw:480,th:800};
+}
+
+function redraw(){
+if(!lastImg)return;
+var img=lastImg,o=getOrient(img);
+var iw=img.naturalWidth,ih=img.naturalHeight;
+var tw=o.tw,th=o.th;
+var srcRatio=iw/ih,dstRatio=tw/th;
+var dev=Math.abs(srcRatio-dstRatio)/dstRatio;
+
+document.getElementById('orig-info').textContent='原图: '+iw+'×'+ih+' | 目标: '+tw+'×'+th+' | 偏差: '+(dev*100).toFixed(1)+'%';
+var mode=dev<=THRESHOLD?'stretch':'fit';
+document.getElementById('mode-info').innerHTML='自动选择: <b>'+(mode==='stretch'?'拉伸填满 (≤25%)':'等比留白 (>25%)')+'</b>';
+
+autoCanvas=mode==='stretch'?stretch(img,tw,th):fit(img,tw,th);
+var panels=[
+{h:'自动<span class="tag '+(mode==='stretch'?'tag-stretch':'tag-fit')+'">发送这个</span>',c:autoCanvas},
+{h:'等比留白<span class="tag tag-fit">纸白</span>',c:fit(img,tw,th)},
+{h:'拉伸填满<span class="tag tag-stretch">强制</span>',c:stretch(img,tw,th)}
+];
+var html='';
+for(var i=0;i<panels.length;i++){
+html+='<div class="panel"><h3>'+panels[i].h+'</h3><canvas width="'+tw+'" height="'+th+'" style="max-width:'+(tw>th?360:220)+'px"></canvas><div class="info">'+panels[i].c.note+'</div></div>'}
+document.getElementById('panels').innerHTML=html;
+setTimeout(function(){
+var cv=document.querySelectorAll('#panels canvas');
+for(var i=0;i<cv.length;i++){cv[i].getContext('2d').drawImage(panels[i].c.c,0,0)}
+},10);
+}
+
+function fit(img,w,h){
+var c=document.createElement('canvas');c.width=w;c.height=h;
+var ctx=c.getContext('2d');
+ctx.fillStyle=PAPER;ctx.fillRect(0,0,w,h);
+var iw=img.naturalWidth,ih=img.naturalHeight;
+var s=Math.min(w/iw,h/ih);
+var sw=Math.round(iw*s),sh=Math.round(ih*s);
+ctx.drawImage(img,0,0,iw,ih, Math.round((w-sw)/2),Math.round((h-sh)/2), sw,sh);
+return {c:c,note:'缩放 '+s.toFixed(3)+' | '+sw+'×'+sh+' | '+PAPER};
+}
+function stretch(img,w,h){
+var c=document.createElement('canvas');c.width=w;c.height=h;
+var ctx=c.getContext('2d');
+ctx.drawImage(img,0,0,w,h);
+return {c:c,note:'拉伸到 '+w+'×'+h};
+}
+
+// BMP builder + send
+function buildBmp(canvas){
+var w=canvas.width,h=canvas.height;
+var rowSize=Math.ceil((3*w)/4)*4,padSize=rowSize*h;
+var total=54+padSize,bmp=new Uint8Array(total),dv=new DataView(bmp.buffer);
+dv.setUint8(0,0x42);dv.setUint8(1,0x4D);
+dv.setUint32(2,total,true);dv.setUint32(10,54,true);
+dv.setUint32(14,40,true);dv.setUint32(18,w,true);dv.setUint32(22,h,true);
+dv.setUint16(26,1,true);dv.setUint16(28,24,true);dv.setUint32(34,padSize,true);
+var ctx=canvas.getContext('2d'),id=ctx.getImageData(0,0,w,h),rgba=id.data;
+var off=54;
+for(var y=h-1;y>=0;y--){var ro=0;
+for(var x=0;x<w;x++){var i=(y*w+x)*4;
+bmp[off+ro]=rgba[i+2];bmp[off+ro+1]=rgba[i+1];bmp[off+ro+2]=rgba[i];ro+=3}
+while(ro%4){bmp[off+ro]=0;ro++}off+=rowSize}
+return bmp;
+}
+
+function sendToESP(){
+if(!autoCanvas){alert('请先选择图片');return}
+var ip=document.getElementById('esp-ip').value.trim();
+if(!ip){alert('请输入 ESP32 IP');return}
+var msg=document.getElementById('send-msg');
+msg.textContent='发送中...';msg.className='msg';
+var bmp=buildBmp(autoCanvas.c);
+var x=new XMLHttpRequest();
+x.open('POST','http://'+ip+'/api/upload?name=scale_preview_'+Date.now());
+x.onload=function(){msg.textContent=x.status==200?'已发送到屏幕！':'发送失败 HTTP '+x.status;msg.className='msg '+(x.status==200?'msg-ok':'msg-err')};
+x.onerror=function(){msg.textContent='发送失败: 网络错误';msg.className='msg msg-err'};
+x.send(bmp);
+}
+</script>
+</body>
+</html>
