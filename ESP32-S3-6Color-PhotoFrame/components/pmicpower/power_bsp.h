@@ -18,3 +18,4 @@ void Axp2101_isChargingTask(void *arg);
 PmicRegisterConfig Custom_PmicGetBatteryInfo(void);
 int Custom_PmicGetBatteryPercent(void);   // -1 = 电池未接入
 int Custom_PmicGetBatteryVoltage(void);   // mV
+bool Custom_PmicGetCharging(void);        // true = 正在充电

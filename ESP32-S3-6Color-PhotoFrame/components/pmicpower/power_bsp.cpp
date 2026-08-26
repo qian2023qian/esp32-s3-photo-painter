@@ -167,3 +167,7 @@ int Custom_PmicGetBatteryPercent(void) {
 int Custom_PmicGetBatteryVoltage(void) {
     return axp2101.getBattVoltage();      // mV
 }
+
+bool Custom_PmicGetCharging(void) {
+    return axp2101.isCharging();
+}

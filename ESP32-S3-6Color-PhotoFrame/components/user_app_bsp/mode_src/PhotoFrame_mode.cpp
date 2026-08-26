@@ -185,6 +185,7 @@ static void slideshow_task(void *arg)
 
         /* 低电量检测（独立于轮播开关）：<10% 暂停轮播显示电量页，充电≥15% 恢复 */
         int pct = Custom_PmicGetBatteryPercent();
+        bool charging = Custom_PmicGetCharging();
         if (pct >= 0 && pct < LOW_BATTERY_ENTER && !low_battery_active) {
             low_battery_active = true;
             photo_running = false;   // 直接改全局，不走 photo_set_running（避免写 NVS）
@@ -194,8 +195,9 @@ static void slideshow_task(void *arg)
             low_battery_active = false;
             photo_running = true;
             xEventGroupSetBits(epaper_groups, set_bit_button(0));   // 恢复轮播，覆盖电量页
-        } else if (low_battery_active && battery_page_dirty) {
-            if (photo_show_battery_page(true)) battery_page_dirty = false;   // 被切图覆盖后重显
+        } else if (low_battery_active && battery_page_dirty && !charging) {
+            // 未充电时被切图覆盖后重显提醒；充电中尊重用户手动切图，不反复刷回电量页
+            if (photo_show_battery_page(true)) battery_page_dirty = false;
         }
 
         if (!photo_running || photo_img_count == 0) { tick_minute = 0; continue; }
