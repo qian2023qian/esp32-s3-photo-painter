@@ -168,6 +168,7 @@ details{margin-bottom:4px}
 <div class="info-row"><span class="key">停止轮播开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
 <div class="info-row"><span class="key">停止轮播结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
 <button class="btn btn-green" onclick="window.saveSettings()" style="margin-top:6px">保存设置</button>
+<p class="msg" id="set-msg"></p>
 </details>
 
 <details id="mqtt-details" style="margin-bottom:8px">
@@ -314,9 +315,13 @@ function resetWifi(){if(!confirm('确定重置WiFi？'))return;
 api('POST','/api/wifi/reset').then(function(){setMsg('wifi-msg','已重置，AP已重启',1);$('wifi-details').open=true})}
 
 function saveSettings(){
-api('POST','/api/settings',{interval:parseInt($('set-interval').value)||60,running:$('set-running').classList.contains('on'),sleep_start:$('set-sleep-start').value,sleep_end:$('set-sleep-end').value}).then(function(d){setMsg('wifi-msg','已保存',1)})}
+api('POST','/api/settings',{interval:parseInt($('set-interval').value)||60,running:$('set-running').classList.contains('on'),sleep_start:$('set-sleep-start').value,sleep_end:$('set-sleep-end').value}).then(function(d){setMsg('set-msg','已保存',1)}).catch(function(){setMsg('set-msg','保存失败',0)})}
 function updateToggle(on){let t=$('set-running');if(on){t.classList.add('on')}else{t.classList.remove('on')}}
-function toggleRunning(){$('set-running').classList.toggle('on')}
+function toggleRunning(){let t=$('set-running');t.classList.toggle('on');let on=t.classList.contains('on');
+// 立即落盘到 NVS，无需再点“保存设置”，断电/重启后仍保持开关状态
+setMsg('set-msg','保存中...',1);
+api('POST','/api/settings',{running:on}).then(function(){setMsg('set-msg',on?'已开启自动轮播（已保存）':'已暂停自动轮播（已保存）',1);updateStatus()})
+.catch(function(){t.classList.toggle('on');setMsg('set-msg','保存失败',0)})}
 function loadSettings(){api('GET','/api/status').then(function(d){$('set-interval').value=d.interval;updateToggle(d.running);if(d.sleep_start)$('set-sleep-start').value=d.sleep_start;if(d.sleep_end)$('set-sleep-end').value=d.sleep_end;if(d.mqtt){updateMqttToggle(d.mqtt.enabled);$('set-mqtt-host').value=d.mqtt.host||'';$('set-mqtt-port').value=d.mqtt.port||1883;$('set-mqtt-user').value=d.mqtt.username||''}})}
 function toggleMqttEnabled(){var t=$('set-mqtt-enabled');t.classList.toggle('on')}
 function updateMqttToggle(on){var t=$('set-mqtt-enabled');if(on){t.classList.add('on')}else{t.classList.remove('on')}}

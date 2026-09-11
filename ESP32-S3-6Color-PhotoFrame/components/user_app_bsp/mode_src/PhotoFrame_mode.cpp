@@ -33,7 +33,7 @@ static bool battery_page_dirty = false;
 uint32_t photo_img_count = 0;
 uint32_t photo_img_index = 0;
 int      photo_interval  = 60;  // minutes
-bool     photo_running   = true;
+bool     photo_running   = true;  // 用户“自动轮播”开关，持久化到 NVS（低电量临时暂停不写这里）
 char     sleep_start[6]  = "23:00";
 char     sleep_end[6]    = "07:00";
 
@@ -187,20 +187,20 @@ static void slideshow_task(void *arg)
         int pct = Custom_PmicGetBatteryPercent();
         bool charging = Custom_PmicGetCharging();
         if (pct >= 0 && pct < LOW_BATTERY_ENTER && !low_battery_active) {
+            // 低电量只置 low_battery_active 做“临时暂停”，不动 photo_running：
+            // photo_running 是用户的自动轮播开关（会持久化），不能被临时状态顶掉
             low_battery_active = true;
-            photo_running = false;   // 直接改全局，不走 photo_set_running（避免写 NVS）
             battery_page_dirty = false;
             if (!photo_show_battery_page(true)) battery_page_dirty = true;   // 上屏失败则下周期重试
         } else if (low_battery_active && pct >= LOW_BATTERY_EXIT) {
             low_battery_active = false;
-            photo_running = true;
-            xEventGroupSetBits(epaper_groups, set_bit_button(0));   // 恢复轮播，覆盖电量页
+            xEventGroupSetBits(epaper_groups, set_bit_button(0));   // 覆盖电量页；轮播按用户开关恢复
         } else if (low_battery_active && battery_page_dirty && !charging) {
             // 未充电时被切图覆盖后重显提醒；充电中尊重用户手动切图，不反复刷回电量页
             if (photo_show_battery_page(true)) battery_page_dirty = false;
         }
 
-        if (!photo_running || photo_img_count == 0) { tick_minute = 0; continue; }
+        if (!photo_running || low_battery_active || photo_img_count == 0) { tick_minute = 0; continue; }
         if (is_sleep_time()) { tick_minute = 0; continue; }
         tick_minute++;
         if (tick_minute >= photo_interval) {

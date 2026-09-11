@@ -32,6 +32,7 @@ extern int      photo_interval;
 extern bool     photo_running;
 extern char     sleep_start[6];
 extern char     sleep_end[6];
+extern "C" void photo_persist_settings(void);
 extern "C" bool photo_get_sensor(float *temp, float *rh);
 extern CustomSDPort *SDPort;
 extern ePaperPort ePaperDisplay;
@@ -312,13 +313,19 @@ static esp_err_t api_settings_post(httpd_req_t *req)
     if (!json) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad JSON"); return ESP_FAIL; }
     bool has_settings = false;
     cJSON *item = cJSON_GetObjectItem(json, "interval");
-    if (item && cJSON_IsNumber(item)) { photo_interval = item->valueint; has_settings = true; }
+    if (item && cJSON_IsNumber(item)) {
+        int v = item->valueint;
+        if (v < 1) v = 1;
+        if (v > 1440) v = 1440;
+        photo_interval = v;
+        has_settings = true;
+    }
     item = cJSON_GetObjectItem(json, "running");
     if (item) { photo_running = cJSON_IsTrue(item); has_settings = true; }
     item = cJSON_GetObjectItem(json, "sleep_start");
-    if (item && cJSON_IsString(item)) { strncpy(sleep_start, item->valuestring, sizeof(sleep_start)); has_settings = true; }
+    if (item && cJSON_IsString(item)) { snprintf(sleep_start, sizeof(sleep_start), "%s", item->valuestring); has_settings = true; }
     item = cJSON_GetObjectItem(json, "sleep_end");
-    if (item && cJSON_IsString(item)) { strncpy(sleep_end, item->valuestring, sizeof(sleep_end)); has_settings = true; }
+    if (item && cJSON_IsString(item)) { snprintf(sleep_end, sizeof(sleep_end), "%s", item->valuestring); has_settings = true; }
 
     item = cJSON_GetObjectItem(json, "mqtt");
     if (item && cJSON_IsObject(item)) {
@@ -330,8 +337,10 @@ static esp_err_t api_settings_post(httpd_req_t *req)
     }
 
     if (has_settings) {
-        char *s = cJSON_PrintUnformatted(json);
-        if (s) { nvs_manager_set_str("photoframe", "interval", s); free(s); }
+        // 写入“完整规范状态”而不是请求原文：这样像 {"running":false} 这类
+        // 只改一个开关的部分更新，不会把 interval / sleep_* 一起覆盖掉，
+        // 断电重启后仍能完整恢复（尤其是自动轮播开关）。
+        photo_persist_settings();
     }
     cJSON_Delete(json);
     httpd_resp_set_type(req, "application/json");
