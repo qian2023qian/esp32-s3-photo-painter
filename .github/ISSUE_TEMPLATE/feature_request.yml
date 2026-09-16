@@ -1,0 +1,56 @@
+name: ✨ 功能建议
+description: 想要的新功能、改进点或兼容性需求
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎提建议。请重点说清**使用场景**——这个项目是"个人相框"取向，
+        很多取舍取决于真实场景（比如墨水屏整屏刷新很慢、ESP32 是单线程 HTTP）。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决什么问题
+      description: 先讲场景和痛点，而不是直接给方案
+      placeholder: 例如：我按主题分了很多目录，但想一次播放所有目录里的图片
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望的方案
+      placeholder: 例如：播放目录下拉框里增加一个「全部（含子目录）」选项
+    validations:
+      required: true
+
+  - type: textarea
+    id: alt
+    attributes:
+      label: 考虑过的替代方案 / 现在怎么绕过的
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 涉及部分
+      options:
+        - 固件 / 仪表盘（ESP32-S3-6Color-PhotoFrame）
+        - Web 仪表盘 UI
+        - AI-Photo-Picker（PC 端选片）
+        - 图片转换工具（ConverTo6c_bmp-7.3）
+        - 文档 / 构建流程
+        - 其他
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索过现有 issue，确认不是重复建议
+          required: true
+        - label: 我理解这个项目是个人作品，维护者可能不会实现或会延后
+          required: true

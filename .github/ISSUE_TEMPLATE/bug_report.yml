@@ -1,0 +1,126 @@
+name: 🐛 Bug 报告
+description: 固件或配套工具出现异常、崩溃、显示错误
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量把下面填完整——**串口日志**和**硬件信息**是定位这类问题的关键。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 问题描述
+      description: 实际现象是什么？和预期差在哪？
+      placeholder: 例如：低电量充电时切换图片，约 1 分钟后画面被刷回电量页
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 电量充到 <10% 并插上充电器
+        2. 打开仪表盘，点击图片列表第 6 张
+        3. 等待约 1 分钟
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: 运行模式
+      options:
+        - 相框模式（PhotoFrame）
+        - 小智模式（XiaoZhi）
+        - 模式选择界面
+        - 不确定 / 未进入任何模式
+    validations:
+      required: true
+
+  - type: input
+    id: board
+    attributes:
+      label: 硬件与开发板
+      description: 墨水屏型号、主控、板子来源（自购/自制）
+      placeholder: Waveshare 7.3" Spectra 6 (GDEP073E01) + ESP32-S3 N16R8，waveshare-s3-PhotoPainter
+    validations:
+      required: true
+
+  - type: dropdown
+    id: fw
+    attributes:
+      label: 固件来源
+      options:
+        - Release 里的预编译镜像
+        - 自行编译（idf.py build / build_demo.ps1）
+    validations:
+      required: true
+
+  - type: input
+    id: ver
+    attributes:
+      label: 固件版本 / commit
+      description: Release 标签，或 `git rev-parse --short HEAD` 的结果
+      placeholder: v2.0.1 / 6faaa89
+    validations:
+      required: true
+
+  - type: input
+    id: idf
+    attributes:
+      label: ESP-IDF 版本（自行编译时填）
+      placeholder: v5.5.4
+
+  - type: dropdown
+    id: sd
+    attributes:
+      label: SD 卡状态
+      description: 本固件对存储卡异常有降级分支，这一项能快速缩小范围
+      options:
+        - 正常（FAT32，已放入图片）
+        - 卡是空的 / 没有 /sdcard/photos
+        - 未插卡或卡损坏（屏幕应显示「存储卡未检测到」）
+        - 不确定
+    validations:
+      required: true
+
+  - type: dropdown
+    id: dir
+    attributes:
+      label: 播放目录与轮播方式（相框模式相关问题时填）
+      options:
+        - 根目录 + 顺序
+        - 分类子目录 + 顺序
+        - 倒序
+        - 随机
+        - 不适用
+
+  - type: textarea
+    id: log
+    attributes:
+      label: 串口日志
+      description: |
+        `idf.py -p COMx monitor` 的输出。请**从开机第一条**开始，包含触发问题前后的完整片段。
+        粘贴时用代码块（```）包起来。
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他补充
+      description: 截图、视频、你对根因的猜测等
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索过现有 issue，确认不是重复问题
+          required: true
+        - label: 日志里没有包含我的 WiFi 密码、API Key 等敏感信息
+          required: true

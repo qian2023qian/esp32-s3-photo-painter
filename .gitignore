@@ -41,3 +41,6 @@ ConverTo6c_bmp-7.3/Windows/
 
 # 本地截图
 屏幕截图*.png
+
+# 相框实拍原图（每张 4~5MB，仓库内只保留 docs/images/ 下的压缩版）
+ESP32-S3-6Color-PhotoFrame/效果图/

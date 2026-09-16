@@ -7,6 +7,14 @@ PC 端 AI 选片/渲染工具，以及若干配套的离线转换与调试工具
 > **图片处理全部在 PC 或浏览器端完成**（缩放 + 抖动成 6 色 BMP），
 > ESP32 端只负责写 SD 卡 + 刷新墨水屏，从而不占用 MCU 算力。
 
+## 实拍
+
+|  |  |  |
+|:--:|:--:|:--:|
+| ![实拍一](docs/images/frame-1.jpg) | ![实拍二](docs/images/frame-2.jpg) | ![实拍三](docs/images/frame-3.jpg) |
+
+<sub>6 色墨水屏无背光、断电保持画面；图片经 6 色抖动后由仪表盘或 PC 端工具推送到相框。</sub>
+
 ---
 
 ## 仓库内容
@@ -36,7 +44,9 @@ PC 端 AI 选片/渲染工具，以及若干配套的离线转换与调试工具
 
 ## 快速开始
 
-固件（需要 ESP-IDF v5.5.x，目标 `esp32s3`，开发板 `waveshare-s3-PhotoPainter`）：
+**不想装 ESP-IDF 的话**，直接去 [Releases](https://github.com/qian2023qian/esp32-s3-photo-painter/releases) 下载预编译固件，见下方 [下载与刷写](#下载与刷写)。
+
+自行编译固件（需要 ESP-IDF v5.5.x，目标 `esp32s3`，开发板 `waveshare-s3-PhotoPainter`）：
 
 ```powershell
 cd ESP32-S3-6Color-PhotoFrame
@@ -56,6 +66,35 @@ python main.py analyze     # 用 VLM 扫描相册并评分
 python main.py render      # 选"历史上的今天"渲染 6 色 BMP 并推送相框
 python main.py serve       # 打开 WebUI 浏览/渲染/推送
 ```
+
+---
+
+## 下载与刷写
+
+预编译固件在 [Releases](https://github.com/qian2023qian/esp32-s3-photo-painter/releases)：
+
+| 文件 | 用途 | 烧录偏移 |
+|------|------|----------|
+| `ESP32-S3-PhotoPainter-v2.0.1-merged.bin` | 单文件镜像（bootloader + 分区表 + 应用），**首次刷写用** | `0x0` |
+| `ESP32-S3-PhotoPainter-v2.0.1-app.bin` | 仅应用，用于升级 | `0x20000` |
+
+```bash
+# 首次刷写（单文件，一条命令搞定）
+esptool.py --chip esp32s3 -b 460800 --before default_reset --after hard_reset \
+  write_flash 0x0 ESP32-S3-PhotoPainter-v2.0.1-merged.bin
+```
+
+> ⚠️ 单文件镜像从 `0x0` 写入，会**覆盖 NVS 分区**（`0x9000`）→ WiFi 凭据与相框设置被清空，
+> 相当于恢复出厂设置。只想升级应用、保留设置的话，请把 `…-app.bin` 烧到 `0x20000`。
+
+也可以用乐鑫的 Flash Download Tool：芯片选 **ESP32-S3**、Flash **16MB**、**DIO**、**80MHz**，把合并镜像下载到 `0x0`。
+
+**SD 卡准备**
+
+- 格式化为 **FAT32**。
+- 相框模式：图片放 `/sdcard/photos/`（可再建一级分类目录），首次为空时墨水屏会显示提示页。
+- 小智模式的天气页还需要 `/sdcard/01_sys_init_img/` 下的初始图与天气图标，
+  **本仓库未附带**这些素材（它们来自微雪官方资料，请自行获取）。
 
 ---
 
