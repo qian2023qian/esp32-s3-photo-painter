@@ -21,7 +21,7 @@ PC 端 AI 选片/渲染工具，以及若干配套的离线转换与调试工具
 
 | 目录 / 文件 | 说明 |
 |-------------|------|
-| `ESP32-S3-6Color-PhotoFrame/` | **相框固件**（ESP-IDF）。基于 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 修改，集成小智 AI 语音；含 SD 卡轮播、分类目录、顺序/倒序/随机轮播、WiFi 配网 + Web 仪表盘（上传/调色/推送）、低电量提示页、中文电量页。详见该目录 `README.md` |
+| `ESP32-S3-6Color-PhotoFrame/` | **相框固件**（ESP-IDF）。基于**微雪官方固件**（ESP32-S3-PhotoPainter）修改，该官方固件本身是 xiaozhi-esp32 的衍生；集成小智 AI 语音；含 SD 卡轮播、分类目录、顺序/倒序/随机轮播、WiFi 配网 + Web 仪表盘（上传/调色/推送）、低电量提示页、中文电量页。详见该目录 `README.md` |
 | `AI-Photo-Picker/` | **PC 端 AI 选片工具**（Python）。用 VLM 给整本相册打分写文案 → 按"历史上的今天"选片 → 渲染 6 色 BMP → 推送到相框。详见该目录 `README.md` |
 | `ConverTo6c_bmp-7.3/` | 离线图片转换工具：把任意图片转成墨水屏可用的 6 色 BMP（`convert.py`）。原先随附的 Windows/Mac **预编译二进制已移出仓库**——它们没有许可声明，再分发存在风险 |
 | `compare.html` / `scale-preview.html` | 浏览器端调试工具：抖动/调色管线对比、缩放模式预览 |
@@ -99,7 +99,7 @@ esptool.py --chip esp32s3 -b 460800 --before default_reset --after hard_reset \
 
 本仓库自有代码以 **MIT** 许可发布，见 [`LICENSE`](LICENSE)。
 
-仓库内含**第三方开源代码的衍生作品**（`ESP32-S3-6Color-PhotoFrame/` 源自 xiaozhi-esp32，
-`AI-Photo-Picker/` 源自另一个 MIT 项目），它们各自保留原有版权与许可声明，**不**被重新授权；
+仓库内含**第三方开源代码的衍生作品**（`ESP32-S3-6Color-PhotoFrame/` 基于微雪官方固件，该固件本身
+源自 xiaozhi-esp32；`AI-Photo-Picker/` 源自另一个 MIT 项目），它们各自保留原有版权与许可声明，**不**被重新授权；
 另有若干第三方组件与数据集（ESP-IDF、LVGL、XPowersLib、GeoNames 城市数据等）遵循其自身许可。
 完整清单见 [`NOTICE.md`](NOTICE.md)。

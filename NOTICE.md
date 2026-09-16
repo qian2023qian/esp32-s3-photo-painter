@@ -8,7 +8,7 @@
 
 | 目录 | 来源 | 许可 |
 |------|------|------|
-| `ESP32-S3-6Color-PhotoFrame/` | 基于 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 修改，并包含 Waveshare 官方新版固件的板级代码 | MIT，Copyright (c) 2025 Shenzhen Xinzhi Future Technology Co., Ltd.（原许可见该目录下 `LICENSE`） |
+| `ESP32-S3-6Color-PhotoFrame/` | 基于**微雪官方固件**（ESP32-S3-PhotoPainter）修改。该官方固件本身是 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 的衍生——微雪例程目录即 `01_Example/xiaozhi-esp32`，其 README 亦注明"该项目使用了虾哥 xiaozhi-esp32 开源项目"。本固件的框架层（`main/`，含小智 AI 语音、LVGL、协议栈）与相框应用层（`components/`）分别来自这条链路 | xiaozhi-esp32 部分为 MIT，Copyright (c) 2025 Shenzhen Xinzhi Future Technology Co., Ltd.（原许可见该目录下 `LICENSE`）；微雪官方代码部分见其发行包内声明 |
 | `AI-Photo-Picker/` | 衍生自 upstream 的 MIT 项目 | MIT，Copyright (c) 2025 dai-hongtao（原许可见该目录下 `LICENSE`） |
 
 ## 2. 第三方组件
@@ -29,8 +29,7 @@
 
 ## 4. 其他
 
-- `参考/` 目录仅用于指向两个参考项目（InkTime、微雪官方新版源码），**未随仓库分发**，
-  克隆后为空目录。
+- 作者本机另有一份 `参考/` 目录（微雪官方新版源码、InkTime 等），仅作本地对照，**未纳入本仓库**。
 - `ConverTo6c_bmp-7.3/` 中原先随附的 Windows/Mac 预编译二进制因没有许可声明，已移出仓库；
   仓库内只保留 `convert.py` 实现。
 - 固件中可能出现的第三方商标、产品名（Waveshare、小智 等）归各自所有者所有。

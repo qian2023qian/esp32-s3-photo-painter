@@ -1,6 +1,7 @@
 # ESP32-S3 6-Color PhotoFrame
 
-> 基于 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32)（微雪官方新版固件重构）的 **7.3 寸六色墨水屏智能相框**。
+> 基于 **微雪官方固件**（[ESP32-S3-PhotoPainter](https://www.waveshare.net/wiki/ESP32-S3-PhotoPainter)）修改的 **7.3 寸六色墨水屏智能相框**。
+> 微雪那份官方固件本身是 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 的衍生（其例程目录即 `01_Example/xiaozhi-esp32`），本固件的「小智 AI 语音」部分由此而来。
 
 一块 ESP32-S3 驱动的电子相框：静态展示 **Waveshare 7.3" Spectra 6 墨水屏 (800×480)**，支持 SD 卡本地轮播、WiFi 配网、Web 仪表盘上传/调色/推送，并集成 **小智 AI 语音交互**。
 
