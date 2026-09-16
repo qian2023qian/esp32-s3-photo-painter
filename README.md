@@ -24,10 +24,7 @@ PC 端 AI 选片/渲染工具，以及若干配套的离线转换与调试工具
 | `ESP32-S3-6Color-PhotoFrame/` | **相框固件**（ESP-IDF）。基于 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 修改，集成小智 AI 语音；含 SD 卡轮播、分类目录、顺序/倒序/随机轮播、WiFi 配网 + Web 仪表盘（上传/调色/推送）、低电量提示页、中文电量页。详见该目录 `README.md` |
 | `AI-Photo-Picker/` | **PC 端 AI 选片工具**（Python）。用 VLM 给整本相册打分写文案 → 按"历史上的今天"选片 → 渲染 6 色 BMP → 推送到相框。详见该目录 `README.md` |
 | `ConverTo6c_bmp-7.3/` | 离线图片转换工具：把任意图片转成墨水屏可用的 6 色 BMP（`convert.py`）。原先随附的 Windows/Mac **预编译二进制已移出仓库**——它们没有许可声明，再分发存在风险 |
-| `开发日志.md` | 开发日志：记录遇到的问题、根因与解决方案（墨水屏点阵字库、FAT32 目录顺序、lwIP 套接字耗尽等踩坑记录） |
 | `compare.html` / `scale-preview.html` | 浏览器端调试工具：抖动/调色管线对比、缩放模式预览 |
-| `CLAUDE.md` | 本仓库使用的 AI 辅助开发约定（面向开发者/工具，可忽略） |
-| `参考/` | 两个参考项目的 gitlink 指针（InkTime、微雪官方新版源码），**未随仓库分发**，克隆后为空目录 |
 
 ---
 

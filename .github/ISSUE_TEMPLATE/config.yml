@@ -3,9 +3,6 @@ contact_links:
   - name: 📖 固件文档（编译 / 刷写 / SD 卡目录 / HTTP API）
     url: https://github.com/qian2023qian/esp32-s3-photo-painter/blob/main/ESP32-S3-6Color-PhotoFrame/README.md
     about: 仪表盘、分类目录、批量上传、API 与已知陷阱都写在这里，提问前建议先翻一遍
-  - name: 📋 开发日志（踩坑记录与根因分析）
-    url: https://github.com/qian2023qian/esp32-s3-photo-painter/blob/main/开发日志.md
-    about: 墨水屏点阵字库、FAT32 目录顺序、lwIP 套接字耗尽等问题的过程记录
   - name: 🔌 上游项目 xiaozhi-esp32
     url: https://github.com/78/xiaozhi-esp32
     about: 与本仓库改动无关的小智框架问题（如语音链路、后端接入），请到上游提问
