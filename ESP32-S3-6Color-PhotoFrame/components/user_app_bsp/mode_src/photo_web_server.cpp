@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <dirent.h>
 #include <esp_timer.h>
 
 static const char *TAG = "photoweb";
@@ -32,8 +33,45 @@ extern int      photo_interval;
 extern bool     photo_running;
 extern char     sleep_start[6];
 extern char     sleep_end[6];
+extern char     photo_dir[];        // 当前播放目录（/sdcard/photos 下的一级子目录，空=根目录）
+extern int      photo_play_mode;    // 0=顺序 1=倒序 2=随机
 extern "C" void photo_persist_settings(void);
+extern "C" void photo_rescan_current_dir(void);
+extern "C" void photo_set_dir(const char *dir);
+extern "C" void photo_set_play_mode(int mode);
 extern "C" bool photo_get_sensor(float *temp, float *rh);
+
+/* 播放目录下的一级分类子目录名上限（与 PhotoFrame_mode.cpp 的 PHOTO_DIR_MAXLEN 对齐） */
+#define PHOTO_DIR_MAXLEN 32
+
+/* 目录名是否合法：一层、非空、无分隔符/引号与 ..（引号会破坏 NVS 里的设置 JSON） */
+static bool dir_name_ok(const char *d)
+{
+    if (!d || !d[0]) return false;
+    if (strlen(d) > PHOTO_DIR_MAXLEN) return false;
+    if (strchr(d, '/') || strchr(d, '\\') || strchr(d, '"') || strstr(d, "..")) return false;
+    return true;
+}
+
+/* 拼出当前播放目录的完整路径 */
+static void current_dir_path(char *out, size_t n)
+{
+    if (photo_dir[0]) snprintf(out, n, "/sdcard/photos/%s", photo_dir);
+    else              snprintf(out, n, "/sdcard/photos");
+}
+
+/* 把文件名解析成当前播放目录下的完整路径，并挡住目录穿越。
+   列表/缩略图/删除都只传 basename，目录恒为“当前播放目录”，
+   这样分类目录与根目录可以共用同一套前端逻辑。 */
+static bool resolve_photo_path(char *out, size_t outsz, const char *name)
+{
+    if (!name || !name[0]) return false;
+    if (strchr(name, '/') || strchr(name, '\\') || strstr(name, "..")) return false;
+    char dir[128];
+    current_dir_path(dir, sizeof(dir));
+    snprintf(out, outsz, "%s/%s", dir, name);
+    return true;
+}
 extern CustomSDPort *SDPort;
 extern ePaperPort ePaperDisplay;
 
@@ -57,6 +95,8 @@ static esp_err_t api_get_status(httpd_req_t *req)
     cJSON_AddBoolToObject(root, "running", photo_running);
     cJSON_AddStringToObject(root, "sleep_start", sleep_start);
     cJSON_AddStringToObject(root, "sleep_end", sleep_end);
+    cJSON_AddStringToObject(root, "dir", photo_dir);          // 当前播放目录（空=根目录）
+    cJSON_AddNumberToObject(root, "mode", photo_play_mode);   // 0=顺序 1=倒序 2=随机
     // 电量信息
     PmicRegisterConfig pmic = Custom_PmicGetBatteryInfo();
     int pct = Custom_PmicGetBatteryPercent();
@@ -89,6 +129,14 @@ static esp_err_t api_get_status(httpd_req_t *req)
 /* ---- GET /api/photos ---- */
 static esp_err_t api_photos_get(httpd_req_t *req)
 {
+    /* ?reload=1：先从 SD 重新扫描当前播放目录再返回。
+       批量上传（show=0）结束后调一次，顺带也支持在电脑上直接往卡里拷图后刷新列表。 */
+    char qbuf[64], rl[4] = {0};
+    if (httpd_req_get_url_query_str(req, qbuf, sizeof(qbuf)) == ESP_OK &&
+        httpd_query_key_value(qbuf, "reload", rl, sizeof(rl)) == ESP_OK && rl[0] == '1') {
+        photo_rescan_current_dir();
+    }
+
     cJSON *root  = cJSON_CreateObject();
     cJSON *files = cJSON_CreateArray();
     list_t *host = SDPort->SDPort_GetListHost();
@@ -111,6 +159,74 @@ static esp_err_t api_photos_get(httpd_req_t *req)
     httpd_resp_send(req, json_str, HTTPD_RESP_USE_STRLEN);
     free(json_str);
     cJSON_Delete(root);
+    return ESP_OK;
+}
+
+/* ---- GET /api/dirs ---- 列出 /sdcard/photos 下的一级分类子目录 */
+static esp_err_t api_dirs_get(httpd_req_t *req)
+{
+    add_cors(req);
+    mkdir("/sdcard/photos", 0777);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *arr  = cJSON_CreateArray();
+    cJSON_AddItemToArray(arr, cJSON_CreateString(""));      // 第一项固定是根目录
+
+    DIR *d = opendir("/sdcard/photos");
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL) {
+            if (e->d_type != DT_DIR) continue;              // 只要目录
+            if (e->d_name[0] == '.') continue;              // . / .. / 隐藏目录
+            if (!dir_name_ok(e->d_name)) continue;          // 与 mkdir 校验一致
+            cJSON_AddItemToArray(arr, cJSON_CreateString(e->d_name));
+        }
+        closedir(d);
+    }
+
+    cJSON_AddItemToObject(root, "dirs", arr);
+    cJSON_AddStringToObject(root, "current", photo_dir);
+    char *s = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, s, HTTPD_RESP_USE_STRLEN);
+    free(s);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+/* ---- POST /api/mkdir ---- 在 /sdcard/photos 下新建分类目录 {"name":"猫咪"} */
+static esp_err_t api_mkdir_post(httpd_req_t *req)
+{
+    char buf[128];
+    int len = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (len <= 0) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty"); return ESP_FAIL; }
+    buf[len] = '\0';
+
+    cJSON *json = cJSON_Parse(buf);
+    if (!json) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad JSON"); return ESP_FAIL; }
+
+    cJSON *it = cJSON_GetObjectItem(json, "name");
+    bool ok = false;
+    bool existed = false;
+    if (it && cJSON_IsString(it) && dir_name_ok(it->valuestring)) {
+        char path[128];
+        snprintf(path, sizeof(path), "/sdcard/photos/%s", it->valuestring);
+        if (mkdir(path, 0777) == 0) {
+            ok = true;
+        } else {
+            struct stat st;
+            if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) { ok = true; existed = true; }
+        }
+        ESP_LOGI(TAG, "mkdir %s -> %s", path, ok ? (existed ? "already exists" : "ok") : "fail");
+    }
+    cJSON_Delete(json);
+
+    httpd_resp_set_type(req, "application/json");
+    if (ok) {
+        httpd_resp_sendstr(req, existed ? "{\"ok\":true,\"existed\":true}" : "{\"ok\":true}");
+    } else {
+        httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"创建失败：名称非法（只能是单层、不含 / 与 ..、不超过 32 字符）\"}");
+    }
     return ESP_OK;
 }
 
@@ -201,8 +317,7 @@ static void ai_cleanup(int64_t max_count)
         ESP_LOGI(TAG, "ai_ cleanup: %lld ai files > %lld, unlink oldest %s",
                  (long long)ai_cnt, (long long)max_count, oldest);
         unlink(oldest);
-        SDPort->SDPort_ScanListDir("/sdcard/photos");
-        photo_img_count = SDPort->SDPort_GetScanListValue();
+        photo_rescan_current_dir();
     }
 }
 
@@ -210,7 +325,10 @@ static void ai_cleanup(int64_t max_count)
 static esp_err_t api_upload(httpd_req_t *req)
 {
     add_cors(req);
+    char dirpath[128];
+    current_dir_path(dirpath, sizeof(dirpath));
     mkdir("/sdcard/photos", 0777);
+    mkdir(dirpath, 0777);                       // 分类目录可能刚被外部删除，补建
     if (req->content_len <= 0 || req->content_len > 2 * 1024 * 1024) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid size"); return ESP_FAIL;
     }
@@ -226,16 +344,22 @@ static esp_err_t api_upload(httpd_req_t *req)
     }
 
     // Use ?name= if provided, otherwise auto-number
-    char filepath[256], qbuf[256], fname[128] = {0};
+    // filepath 必须能容纳 dirpath(≤127) + '/' + fname(≤127) + ".bmp"，否则触发
+    // -Werror=format-truncation；这里给到 320 留足余量。
+    char filepath[320], qbuf[256], fname[128] = {0};
+    bool show = true;                       // show=0：批量上传用，只落盘不重扫/不上屏
     if (httpd_req_get_url_query_str(req, qbuf, sizeof(qbuf)) == ESP_OK) {
         httpd_query_key_value(qbuf, "name", fname, sizeof(fname));
+        char show_str[4] = {0};
+        if (httpd_query_key_value(qbuf, "show", show_str, sizeof(show_str)) == ESP_OK)
+            show = (show_str[0] != '0');
     }
     if (fname[0]) {
         // Basic sanitize: strip path separators
         for (char *p = fname; *p; p++) if (*p == '/' || *p == '\\') *p = '_';
-        snprintf(filepath, sizeof(filepath), "/sdcard/photos/%s.bmp", fname);
+        snprintf(filepath, sizeof(filepath), "%s/%s.bmp", dirpath, fname);
     } else {
-        snprintf(filepath, sizeof(filepath), "/sdcard/photos/%d.bmp", (int)photo_img_count);
+        snprintf(filepath, sizeof(filepath), "%s/%d.bmp", dirpath, (int)photo_img_count);
     }
 
     int64_t t0 = esp_timer_get_time();
@@ -245,11 +369,19 @@ static esp_err_t api_upload(httpd_req_t *req)
     vTaskDelay(pdMS_TO_TICKS(50)); // Ensure SD write is flushed before scan
     if (ret != ESP_OK) { httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "SD write failed"); return ESP_FAIL; }
 
-    // 重新扫描以更新列表（ScanListDir 会先清空再扫描）
+    if (!show) {
+        /* 批量上传：只落盘。整批结束后由前端调 /api/photos?reload=1 统一重扫一次，
+           否则 N 张图会带来 N 次全目录重扫 + N 次墨水屏整屏刷新（很慢且一直闪） */
+        ESP_LOGI(TAG, "上传完成(不显示): %s", filepath);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"ok\",\"shown\":false}");
+        return ESP_OK;
+    }
+
+    // 重新扫描以更新列表（photo_rescan_current_dir 内部会先清空再扫描）
     int64_t t1 = esp_timer_get_time();
-    SDPort->SDPort_ScanListDir("/sdcard/photos");
+    photo_rescan_current_dir();
     ESP_LOGI(TAG, "SD scan: %lld us", esp_timer_get_time() - t1);
-    photo_img_count = SDPort->SDPort_GetScanListValue();
     // AI 推送照片超上限时清理最旧的（新文件时间戳最新，不会被删）
     if (strncmp(fname, "ai_", 3) == 0) {
         ai_cleanup(AI_MAX_FILES);
@@ -288,13 +420,16 @@ static esp_err_t api_delete(httpd_req_t *req)
     if (!name_item || !name_item->valuestring) { cJSON_Delete(json); httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing name"); return ESP_FAIL; }
     const char *name = name_item->valuestring;
     char path[256];
-    snprintf(path, sizeof(path), "/sdcard/photos/%s", name);
+    if (!resolve_photo_path(path, sizeof(path), name)) {
+        cJSON_Delete(json);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad name");
+        return ESP_FAIL;
+    }
     unlink(path);
-    // 重新扫描以更新列表（ScanListDir 会先清空再扫描）
+    // 重新扫描以更新列表（photo_rescan_current_dir 内部会先清空再扫描）
     int64_t t1 = esp_timer_get_time();
-    SDPort->SDPort_ScanListDir("/sdcard/photos");
+    photo_rescan_current_dir();
     ESP_LOGI(TAG, "SD scan: %lld us", esp_timer_get_time() - t1);
-    photo_img_count = SDPort->SDPort_GetScanListValue();
     if (photo_img_index >= photo_img_count && photo_img_count > 0)
         photo_img_index = photo_img_count - 1;
     cJSON_Delete(json);
@@ -326,6 +461,24 @@ static esp_err_t api_settings_post(httpd_req_t *req)
     if (item && cJSON_IsString(item)) { snprintf(sleep_start, sizeof(sleep_start), "%s", item->valuestring); has_settings = true; }
     item = cJSON_GetObjectItem(json, "sleep_end");
     if (item && cJSON_IsString(item)) { snprintf(sleep_end, sizeof(sleep_end), "%s", item->valuestring); has_settings = true; }
+
+    item = cJSON_GetObjectItem(json, "dir");
+    if (item && cJSON_IsString(item)) {
+        /* 目录切换有副作用（重扫、重置索引与随机序、立刻上屏），交给 photo_set_dir 处理；
+           空串表示根目录。名字非法时 photo_set_dir 会忽略并保留原目录。 */
+        const char *nd = item->valuestring;
+        if ((nd[0] == '\0' || dir_name_ok(nd)) && strcmp(nd, photo_dir) != 0) {
+            photo_set_dir(nd);
+            has_settings = true;
+        }
+    }
+
+    item = cJSON_GetObjectItem(json, "mode");
+    if (item && cJSON_IsNumber(item)) {
+        /* 0=顺序 1=倒序 2=随机；内部做范围校验、重置随机序并持久化 */
+        photo_set_play_mode(item->valueint);
+        has_settings = true;
+    }
 
     item = cJSON_GetObjectItem(json, "mqtt");
     if (item && cJSON_IsObject(item)) {
@@ -406,7 +559,10 @@ static esp_err_t api_photo_get(httpd_req_t *req)
     }
     if (!fname[0]) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing name"); return ESP_FAIL; }
     char path[300];
-    snprintf(path, sizeof(path), "/sdcard/photos/%s", fname);
+    if (!resolve_photo_path(path, sizeof(path), fname)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad name");
+        return ESP_FAIL;
+    }
 
     // Check for thumbnail request
     char thumb_str[4] = {0};
@@ -544,7 +700,7 @@ static void register_post(const char *p, esp_err_t (*h)(httpd_req_t *)) {
 extern "C" void photo_web_server_init(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 24;
     if (httpd_start(&server, &config) == ESP_OK) {
         ESP_LOGI(TAG, "Web 服务器已启动, 端口 %d", config.server_port);
         httpd_uri_t opt = {.uri = "/*", .method = HTTP_OPTIONS, .handler = cors_options};
@@ -554,6 +710,8 @@ extern "C" void photo_web_server_init(void)
         register_get("/", serve_index);
         register_get("/api/status", api_get_status);
         register_get("/api/photos", api_photos_get);
+        register_get("/api/dirs", api_dirs_get);
+        register_post("/api/mkdir", api_mkdir_post);
         register_get("/api/wifi/scan", api_wifi_scan);
         register_post("/api/wifi/connect", api_wifi_connect);
         register_post("/api/wifi/reset", api_wifi_reset);

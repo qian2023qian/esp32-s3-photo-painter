@@ -5,6 +5,8 @@
 #include <esp_sleep.h>
 #include <esp_sntp.h>
 #include <esp_timer.h>
+#include <esp_heap_caps.h>
+#include <esp_random.h>
 #include <time.h>
 #include <sys/stat.h>
 
@@ -37,6 +39,22 @@ bool     photo_running   = true;  // 用户“自动轮播”开关，持久化�
 char     sleep_start[6]  = "23:00";
 char     sleep_end[6]    = "07:00";
 
+/* ---- 播放目录与轮播方式（分类目录特性）----
+   photo_dir：/sdcard/photos 下的**一级**子目录名，空串表示直接播放根目录下的图片。
+   两项目前都持久化在 NVS 的 photoframe/interval 键里（见 photo_persist_settings）。*/
+#define PHOTO_PLAY_SEQ     0     // 顺序（文件名/readdir 顺序）
+#define PHOTO_PLAY_REV     1     // 倒序
+#define PHOTO_PLAY_RANDOM  2     // 随机（洗牌不重复）
+#define PHOTO_DIR_MAXLEN   32
+
+char     photo_dir[40]   = "";    // 当前播放目录（相对名，空=根目录）
+int      photo_play_mode = PHOTO_PLAY_SEQ;
+
+/* 随机播放用的洗牌序列（PSRAM），每轮把 0..count-1 洗一次，保证一轮内不重复 */
+static uint16_t *photo_rand_order = NULL;
+static uint32_t  photo_rand_cap   = 0;
+static uint32_t  photo_rand_pos   = 0;
+
 static list_t *photoframe_list = NULL;
 static Shtc3Port *shtc3 = NULL;
 
@@ -47,6 +65,79 @@ extern "C" bool photo_get_sensor(float *temp, float *rh)
 {
     if (!shtc3) return false;
     return shtc3->Shtc3_ReadTempHumi(temp, rh);
+}
+
+/* ================= 播放目录 / 轮播方式 ================= */
+
+/* 目录名合法性：只允许一层，非空，不含分隔符、引号与 ..，长度受限。
+   引号必须挡掉：目录名会写进 NVS 里的 JSON（photo_persist_settings），
+   带 " 会让下次开机解析失败、设置整份丢失。 */
+static bool photo_dir_name_valid(const char *d)
+{
+    if (!d || !d[0]) return false;                       // 空串是“根目录”，由调用方另行处理
+    if (strlen(d) > PHOTO_DIR_MAXLEN) return false;
+    if (strchr(d, '/') || strchr(d, '\\') || strchr(d, '"') || strstr(d, "..")) return false;
+    return true;
+}
+
+/* 按 photo_dir 拼出完整播放目录路径 */
+static void photo_build_dir_path(char *out, size_t n)
+{
+    if (photo_dir[0]) snprintf(out, n, "/sdcard/photos/%s", photo_dir);
+    else              snprintf(out, n, "/sdcard/photos");
+}
+
+/* 洗牌一轮：把 0..count-1 打乱放进 photo_rand_order，游标归零 */
+static void photo_rand_shuffle(void)
+{
+    photo_rand_pos = 0;
+    if (photo_img_count == 0) return;
+
+    if (photo_rand_cap < photo_img_count) {
+        uint16_t *p = (uint16_t *)heap_caps_realloc(photo_rand_order,
+                                                   photo_img_count * sizeof(uint16_t),
+                                                   MALLOC_CAP_SPIRAM);
+        if (!p) {                                        // 内存不足：退化为顺序播放
+            ESP_LOGW(TAG, "随机序分配失败，随机模式退化为顺序");
+            return;
+        }
+        photo_rand_order = p;
+        photo_rand_cap   = photo_img_count;
+    }
+
+    for (uint32_t i = 0; i < photo_img_count; i++) photo_rand_order[i] = (uint16_t)i;
+    for (uint32_t i = photo_img_count - 1; i > 0; i--) {   // Fisher-Yates
+        uint32_t j = esp_random() % (i + 1);
+        uint16_t t = photo_rand_order[i];
+        photo_rand_order[i] = photo_rand_order[j];
+        photo_rand_order[j] = t;
+    }
+}
+
+/* 按当前轮播方式算出“下一张”的索引（只计算，不改变全局、不刷新） */
+static uint32_t photo_calc_next(uint32_t cur)
+{
+    if (photo_img_count == 0) return 0;
+
+    if (photo_play_mode == PHOTO_PLAY_REV)
+        return (cur + photo_img_count - 1) % photo_img_count;
+
+    if (photo_play_mode == PHOTO_PLAY_RANDOM) {
+        if (!photo_rand_order || photo_rand_cap < photo_img_count) photo_rand_shuffle();
+        if (!photo_rand_order || photo_rand_cap < photo_img_count)   // 分配失败 -> 顺序
+            return (cur + 1) % photo_img_count;
+        if (photo_rand_pos >= photo_img_count) {          // 一轮走完，重新洗牌
+            photo_rand_shuffle();
+            if (photo_img_count > 1 && photo_rand_order[0] == cur) {   // 避免跨轮连续重复
+                uint16_t t = photo_rand_order[0];
+                photo_rand_order[0] = photo_rand_order[1];
+                photo_rand_order[1] = t;
+            }
+        }
+        return photo_rand_order[photo_rand_pos++];
+    }
+
+    return (cur + 1) % photo_img_count;                   // PHOTO_PLAY_SEQ
 }
 
 /* ---- Shared control helpers (web server + MQTT share the same 15s throttle) ---- */
@@ -70,6 +161,73 @@ extern "C" int photo_switch_to(uint32_t index)
     return 1;
 }
 
+/* 按 photo_dir 重新扫描当前播放目录，更新计数/索引并重置随机序。
+   上传、删除、切换目录后都要调用它，替换以前散落各处的
+   SDPort_ScanListDir("/sdcard/photos") + photo_img_count = ... */
+extern "C" void photo_rescan_current_dir(void)
+{
+    char path[128];
+    photo_build_dir_path(path, sizeof(path));
+
+    mkdir("/sdcard/photos", 0777);
+
+    if (photo_dir[0]) {
+        struct stat st;
+        if (stat(path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+            /* 目录被外部删掉/改名了：回退到根目录，避免一直显示“无图片” */
+            ESP_LOGW(TAG, "播放目录不存在，回退到根目录: %s", path);
+            photo_dir[0] = '\0';
+            photo_build_dir_path(path, sizeof(path));
+        }
+    }
+
+    SDPort->SDPort_ScanListDir(path);
+    photo_img_count = SDPort->SDPort_GetScanListValue();
+
+    if (photo_img_count == 0)                                  photo_img_index = 0;
+    else if (photo_img_index >= photo_img_count)               photo_img_index = photo_img_count - 1;
+
+    photo_rand_shuffle();
+    ESP_LOGI(TAG, "播放目录 %s : %lu 张", path, photo_img_count);
+}
+
+/* 切换播放目录（dir 为空 = 根目录）。重扫 + 持久化 + 立刻上屏 */
+extern "C" void photo_set_dir(const char *dir)
+{
+    char clean[sizeof(photo_dir)] = "";
+    if (dir && dir[0]) {
+        if (photo_dir_name_valid(dir)) snprintf(clean, sizeof(clean), "%s", dir);
+        else ESP_LOGW(TAG, "非法目录名被忽略: %s", dir);
+    }
+    snprintf(photo_dir, sizeof(photo_dir), "%s", clean);
+
+    photo_img_index = 0;
+    photo_rescan_current_dir();
+    photo_persist_settings();
+    xEventGroupSetBits(epaper_groups, set_bit_button(0));
+}
+
+/* 设置轮播方式（0=顺序 1=倒序 2=随机） */
+extern "C" void photo_set_play_mode(int mode)
+{
+    if (mode < PHOTO_PLAY_SEQ || mode > PHOTO_PLAY_RANDOM) mode = PHOTO_PLAY_SEQ;
+    if (mode == photo_play_mode) return;
+    photo_play_mode = mode;
+    photo_rand_shuffle();
+    photo_persist_settings();
+    ESP_LOGI(TAG, "轮播方式 -> %s", mode == PHOTO_PLAY_RANDOM ? "随机" :
+                                    (mode == PHOTO_PLAY_REV ? "倒序" : "顺序"));
+}
+
+/* 手动切下一张 / 上一张（带 15s 冷却，走 photo_switch_to）。forward=0 表示上一张 */
+extern "C" int photo_manual_step(int forward)
+{
+    if (photo_img_count == 0) return 0;
+    uint32_t target = forward ? photo_calc_next(photo_img_index)
+                              : (photo_img_index + photo_img_count - 1) % photo_img_count;
+    return photo_switch_to(target);
+}
+
 extern "C" void photo_set_interval(int minutes)
 {
     photo_interval = minutes;
@@ -84,9 +242,11 @@ extern "C" void photo_set_running(bool run)
 
 extern "C" void photo_persist_settings(void)
 {
-    char buf[256];
-    snprintf(buf, sizeof(buf), "{\"interval\":%d,\"running\":%s,\"sleep_start\":\"%s\",\"sleep_end\":\"%s\"}",
-             photo_interval, photo_running ? "true" : "false", sleep_start, sleep_end);
+    char buf[320];
+    snprintf(buf, sizeof(buf),
+             "{\"interval\":%d,\"running\":%s,\"sleep_start\":\"%s\",\"sleep_end\":\"%s\",\"dir\":\"%s\",\"mode\":%d}",
+             photo_interval, photo_running ? "true" : "false", sleep_start, sleep_end,
+             photo_dir, photo_play_mode);
     nvs_manager_set_str("photoframe", "interval", buf);
 }
 
@@ -260,7 +420,7 @@ static void slideshow_task(void *arg)
         tick_minute++;
         if (tick_minute >= photo_interval) {
             tick_minute = 0;
-            photo_img_index = (photo_img_index + 1) % photo_img_count;
+            photo_img_index = photo_calc_next(photo_img_index);   // 顺序/倒序/随机
             xEventGroupSetBits(epaper_groups, set_bit_button(0));
         }
     }
@@ -273,7 +433,7 @@ static void button_task(void *arg)
         EventBits_t even = xEventGroupWaitBits(BootButtonGroups, set_bit_all, pdTRUE, pdFALSE, pdMS_TO_TICKS(2000));
         if (get_bit_button(even, 0)) {
             if (photo_img_count == 0) continue;   // 无图片：保持任务存活（原来 return 会让按键任务永久退出）
-            photo_img_index = (photo_img_index + 1) % photo_img_count;
+            photo_img_index = photo_calc_next(photo_img_index);   // 与自动轮播一致地按方式推进
             xEventGroupSetBits(epaper_groups, set_bit_button(0));
         }
     }
@@ -304,17 +464,24 @@ void User_PhotoFrame_mode_app_init(void)
             if (item && cJSON_IsString(item)) strncpy(sleep_start, item->valuestring, 5);
             item = cJSON_GetObjectItem(json, "sleep_end");
             if (item && cJSON_IsString(item)) strncpy(sleep_end, item->valuestring, 5);
+            item = cJSON_GetObjectItem(json, "dir");
+            if (item && cJSON_IsString(item) && photo_dir_name_valid(item->valuestring))
+                snprintf(photo_dir, sizeof(photo_dir), "%s", item->valuestring);
+            item = cJSON_GetObjectItem(json, "mode");
+            if (item && cJSON_IsNumber(item)) {
+                photo_play_mode = item->valueint;
+                if (photo_play_mode < PHOTO_PLAY_SEQ || photo_play_mode > PHOTO_PLAY_RANDOM)
+                    photo_play_mode = PHOTO_PLAY_SEQ;
+            }
             cJSON_Delete(json);
         }
     }
-    ESP_LOGI(TAG, "轮播间隔: %d 分钟, 运行: %d", photo_interval, photo_running);
+    ESP_LOGI(TAG, "轮播间隔: %d 分钟, 运行: %d, 播放目录: '%s', 方式: %d",
+             photo_interval, photo_running, photo_dir, photo_play_mode);
 
-    // Scan SD card photos directory
-    mkdir("/sdcard/photos", 0777);
-    SDPort->SDPort_ScanListDir("/sdcard/photos");
+    // 扫描当前播放目录（支持 /sdcard/photos 下的一级分类目录；photo_dir 为空即根目录）
     photoframe_list = SDPort->SDPort_GetListHost();
-    photo_img_count = SDPort->SDPort_GetScanListValue();
-    ESP_LOGI(TAG, "SD 卡找到 %lu 张图片", photo_img_count);
+    photo_rescan_current_dir();
 
     /* 一张图都没有（含 SD 未挂载）时，开机就主动刷一页提示：
        否则屏幕会一直停在断电前的旧画面，无法区分“正常运行”和“没读到卡” */

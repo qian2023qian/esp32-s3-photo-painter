@@ -86,6 +86,17 @@ details{margin-bottom:4px}
 .upload-zone:hover{border-color:#58a6ff}
 #upload-progress{display:none;height:4px;background:#30363d;border-radius:2px;margin:6px 0}
 #upload-progress div{height:100%;background:#238636;border-radius:2px;width:0}
+.photo-item.photo-hl{outline:2px solid #3fb950;box-shadow:0 0 0 3px rgba(63,185,80,.28)}
+#batch-card{display:none;margin-top:8px}
+#batch-progress{height:6px;background:#21262d;border-radius:3px;overflow:hidden;margin:6px 0}
+#batch-progress>div{height:100%;width:0;background:linear-gradient(90deg,#238636,#3fb950);transition:width .2s}
+.batch-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;max-height:320px;overflow-y:auto}
+.batch-item{background:var(--cell);border:1px solid #30363d;border-radius:6px;padding:4px;text-align:center}
+.batch-item img{width:100%;height:62px;object-fit:contain;background:#1a1a2e;border-radius:3px;display:block}
+.batch-item .bn{font-size:9px;color:var(--muted);margin:3px 0 1px;word-break:break-all;line-height:1.2}
+.batch-item .bs{font-size:9px;color:#8b949e}
+.batch-item .bs.ok{color:#3fb950}
+.batch-item .bs.err{color:#f85149}
 @media(min-width:768px){body{padding:16px}.dash{max-width:640px}.compare img{height:340px}}
 @media(min-width:1024px){body{padding:20px}.dash{max-width:1100px}.compare img{height:400px}}
 </style>
@@ -122,7 +133,9 @@ details{margin-bottom:4px}
 <h2>上传图片</h2>
 <div class="upload-zone" onclick="document.getElementById('file-input').click()">
 <p style="color:var(--muted);font-size:13px">点击选择图片（支持 JPG/PNG/BMP）</p>
-<input type="file" id="file-input" accept="image/*" style="display:none" onchange="window.fileChanged()">
+<p style="color:var(--muted);font-size:12px">可一次<b>多选</b>：批量上传只写入存储卡、<b>不刷屏</b>；完成后自动跳到图片列表的新增项（高亮），点缩略图即可上屏</p>
+<p style="color:var(--muted);font-size:12px">上传到：<b id="upload-target">（根目录）</b></p>
+<input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="window.fileChanged()">
 </div>
 <div class="compare" id="preview-area" style="display:none">
 <div><img id="preview-orig" alt="原图"><div class="label" id="label-orig">原图</div></div>
@@ -145,10 +158,15 @@ details{margin-bottom:4px}
 </div>
 <div id="upload-progress"><div></div></div>
 <p class="msg" id="upload-msg"></p>
+<div id="batch-card">
+<div id="batch-progress"><div></div></div>
+<div class="batch-list" id="batch-list"></div>
+</div>
 </div>
 <div class="card">
 <h2>图片列表 (<span id="photo-count">0</span>)</h2>
 <div class="photo-grid" id="photo-list"><p style="color:var(--muted);font-size:12px">加载中...</p></div>
+<p class="msg" id="list-msg"></p>
 </div>
 
 <div class="card">
@@ -170,6 +188,11 @@ details{margin-bottom:4px}
 <summary>相框设置</summary>
 <div class="info-row"><span class="key">轮播间隔 (分钟)</span><input id="set-interval" type="number" min="1" max="1440" style="width:120px;margin:0"></div>
 <div class="toggle-row"><span class="key">自动轮播</span><span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span></div>
+<div class="info-row"><span class="key">播放目录</span><select id="set-dir" onchange="window.onDirChange()" style="width:170px;margin:0"></select></div>
+<div class="info-row"><span class="key">轮播方式</span><select id="set-mode" onchange="window.onModeChange()" style="width:170px;margin:0">
+<option value="0">顺序</option><option value="1">倒序</option><option value="2">随机</option>
+</select></div>
+<div class="info-row"><span class="key">新建分类目录</span><input id="new-dir" placeholder="如 猫咪" style="width:110px;margin:0"><button class="btn btn-blue" onclick="window.createDir()" style="padding:5px 10px;font-size:12px;margin-left:6px">创建</button></div>
 <div class="info-row"><span class="key">停止轮播开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
 <div class="info-row"><span class="key">停止轮播结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
 <button class="btn btn-green" onclick="window.saveSettings()" style="margin-top:6px">保存设置</button>
@@ -234,6 +257,7 @@ updateAdjLabels();adjLoaded=true}}).catch(function(){})}
 var calMap={"#000000":"#1f2226","#FFFFFF":"#b9c7c9","#FFFF00":"#c1bb1e","#FF0000":"#62201e","#0000FF":"#233f8e","#00FF00":"#35563a"};
 function toCal(r,g,b){var h="#"+[r,g,b].map(function(v){return v.toString(16).padStart(2,"0")}).join("");return calMap[h.toUpperCase()]}
 var pageStore={};
+var hlNames=new Set();   // 刚批量上传的文件名，用于在列表里高亮
 var thumbPageSize=10;
 function refreshPhotos(){
 	api('GET','/api/photos').then(function(d){
@@ -245,7 +269,7 @@ function renderPage(fromCache){
 	if(!fromCache){var c=pageStore[key];if(c){console.log('Cache HIT:',key);$('photo-list').innerHTML=c;loadThumbsSeq();return}else{console.log('Cache MISS:',key,'available:',Object.keys(pageStore))}}
 	var h='';for(var i=thumbPage*thumbPageSize;i<Math.min(thumbPage*thumbPageSize+thumbPageSize,thumbFiles.length);i++){
 	var f=thumbFiles[i];
-	h+='<div class="photo-item" onclick="window.switchPhoto('+i+')"><img data-src="/api/photo?name='+encodeURIComponent(f)+'&thumb=1"><span class="pname">'+f+'</span><button class="del" onclick="event.stopPropagation();window.delPhoto(\x27'+f+'\x27)">x</button></div>'};
+	h+='<div class="photo-item'+(hlNames.has(f)?' photo-hl':'')+'" onclick="window.switchPhoto('+i+')"><img data-src="/api/photo?name='+encodeURIComponent(f)+'&thumb=1"><span class="pname">'+f+'</span><button class="del" onclick="event.stopPropagation();window.delPhoto(\x27'+f+'\x27)">x</button></div>'};
 	if(total>1)h+=buildPager(total,thumbPage);
 	$('photo-list').innerHTML=h||'<p style="color:var(--muted);font-size:12px">暂无图片</p>';
 	if(thumbFiles.length)loadThumbsSeq()}
@@ -303,7 +327,9 @@ if(cc){var rr=parseInt(cc.slice(1,3),16),gg=parseInt(cc.slice(3,5),16),bb=parseI
 ctx.putImageData(id,0,0);img.removeAttribute('data-src');img.src=cv.toDataURL()}
 function switchPhoto(idx){
 api('POST','/api/switch',{index:idx}).then(function(r){
-if(r.ok){updateStatus()}else{setMsg('wifi-msg',r.msg||'切换失败',0)}}).catch(function(){})}
+if(r.ok){setMsg('list-msg','已切到第 '+(idx+1)+' 张，墨水屏正在整屏刷新…',1);updateStatus()}
+else{setMsg('list-msg',(r&&r.msg)||'切换失败',0)}})
+.catch(function(){setMsg('list-msg','切换失败',0)})}
 function delPhoto(n){if(!confirm('删除 '+n+'?'))return;api('POST','/api/delete',{name:n}).then(function(){var i=thumbFiles.indexOf(n);if(i>=0){thumbFiles.splice(i,1);var pos=i-thumbPage*thumbPageSize;var items=document.querySelectorAll('#photo-list .photo-item');if(pos>=0&&pos<items.length)items[pos].remove()}var maxPg=Math.max(0,Math.ceil(thumbFiles.length/thumbPageSize)-1);if(thumbPage>maxPg){stopThumbs();thumbPaused=0;thumbPage=maxPg;renderPage()}else{var pager=document.querySelector('.photo-pager');if(pager){pager.outerHTML=buildPager(Math.ceil(thumbFiles.length/thumbPageSize)||1,thumbPage)}}updateStatus()})}
 
 function scanWifi(){
@@ -327,7 +353,27 @@ function toggleRunning(){let t=$('set-running');t.classList.toggle('on');let on=
 setMsg('set-msg','保存中...',1);
 api('POST','/api/settings',{running:on}).then(function(){setMsg('set-msg',on?'已开启自动轮播（已保存）':'已暂停自动轮播（已保存）',1);updateStatus()})
 .catch(function(){t.classList.toggle('on');setMsg('set-msg','保存失败',0)})}
-function loadSettings(){api('GET','/api/status').then(function(d){$('set-interval').value=d.interval;updateToggle(d.running);if(d.sleep_start)$('set-sleep-start').value=d.sleep_start;if(d.sleep_end)$('set-sleep-end').value=d.sleep_end;if(d.mqtt){updateMqttToggle(d.mqtt.enabled);$('set-mqtt-host').value=d.mqtt.host||'';$('set-mqtt-port').value=d.mqtt.port||1883;$('set-mqtt-user').value=d.mqtt.username||''}})}
+/* ---- 分类目录 / 轮播方式 ---- */
+function loadDirs(){api('GET','/api/dirs').then(function(d){
+let sel=$('set-dir');if(!sel)return;let cur=d.current||'';sel.innerHTML='';
+(d.dirs||['']).forEach(function(n){let o=document.createElement('option');o.value=n;o.textContent=n?n:'（根目录）';sel.appendChild(o)});
+for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===cur){sel.selectedIndex=i;break}}
+updateUploadTarget()}).catch(function(){})}
+function onDirChange(){let v=$('set-dir').value;setMsg('set-msg','切换中...',1);
+api('POST','/api/settings',{dir:v}).then(function(){
+setMsg('set-msg','已切换到 '+(v||'根目录'),1);
+updateUploadTarget();
+// 目录变了：清掉分页缓存、高亮与缩略图队列，重新拉列表
+hlNames=new Set();thumbPage=0;pageStore={};stopThumbs();thumbPaused=0;refreshPhotos();updateStatus()})
+.catch(function(){setMsg('set-msg','切换目录失败',0)})}
+function onModeChange(){let sel=$('set-mode');let v=parseInt(sel.value,10);
+api('POST','/api/settings',{mode:v}).then(function(){setMsg('set-msg','轮播方式：'+sel.options[sel.selectedIndex].text,1)})
+.catch(function(){setMsg('set-msg','保存失败',0)})}
+function createDir(){let n=($('new-dir').value||'').trim();if(!n)return setMsg('set-msg','请输入目录名',0);
+api('POST','/api/mkdir',{name:n}).then(function(d){
+if(d&&d.ok){$('new-dir').value='';setMsg('set-msg',(d.existed?'目录已存在：':'已创建目录：')+n,1);loadDirs()}
+else{setMsg('set-msg',(d&&d.msg)||'创建失败',0)}}).catch(function(){setMsg('set-msg','创建失败',0)})}
+function loadSettings(){api('GET','/api/status').then(function(d){$('set-interval').value=d.interval;updateToggle(d.running);if(d.mode!==undefined)$('set-mode').value=String(d.mode);if(d.sleep_start)$('set-sleep-start').value=d.sleep_start;if(d.sleep_end)$('set-sleep-end').value=d.sleep_end;if(d.mqtt){updateMqttToggle(d.mqtt.enabled);$('set-mqtt-host').value=d.mqtt.host||'';$('set-mqtt-port').value=d.mqtt.port||1883;$('set-mqtt-user').value=d.mqtt.username||''}})}
 function toggleMqttEnabled(){var t=$('set-mqtt-enabled');t.classList.toggle('on')}
 function updateMqttToggle(on){var t=$('set-mqtt-enabled');if(on){t.classList.add('on')}else{t.classList.remove('on')}}
 function saveMqttSettings(){
@@ -462,15 +508,103 @@ var _r=lastOrigImg.naturalWidth/lastOrigImg.naturalHeight,_tr=currentImgW/curren
 $('label-proc').textContent='目标 '+currentImgW+'×'+currentImgH+' | 偏差 '+(Math.abs(_r-_tr)/_tr*100).toFixed(1)+'% | '+_mode+' | '+_dir;
 await runPipeline(sourceCanvas, currentImgW, currentImgH);
 		$('upload-msg').textContent='已就绪';fileFlag=1}
+/* ================= 上传：单张流程 / 批量流程 ================= */
+function dirLabel(d){return d?d:'（根目录）'}
+function updateUploadTarget(){let t=$('upload-target');let s=$('set-dir');if(t)t.textContent=dirLabel(s?s.value:'')}
+
+/* 上传文件名：管线_抖动_br_ct_st_sh_df_时间戳[_批内序号]。
+   批量必须带序号：时间戳只有秒级精度，同一秒内多张会同名互相覆盖。 */
+function buildSn(a,ts,seq){
+let pipeAbbr={epdoptimize:'epd',opendisplay:'od'};
+let ditAbbr={floydSteinberg:'fs',atkinson:'at',jarvis:'jjn',stucki:'sk',burkes:'bk',sierra3:'s3',sierra2:'s2'};
+let base=(pipeAbbr[a.pipe]||a.pipe)+'_'+(ditAbbr[a.dither]||a.dither)+'_'+a.br+'_'+a.ct+'_'+a.st+'_'+a.sh+'_'+a.df+'_'+ts;
+return (seq===undefined)?base:(base+'_'+seq)}
+
+function loadImgEl(url){return new Promise(function(res,rej){let im=new Image();im.onload=function(){res(im)};im.onerror=function(){rej(new Error('图片解码失败'))};im.src=url})}
+
+function postBmp(name,bmp,show){return new Promise(function(res,rej){
+let x=new XMLHttpRequest();
+x.open('POST','/api/upload?name='+encodeURIComponent(name)+'&show='+(show?1:0));
+x.onload=function(){x.status==200?res():rej(new Error('HTTP '+x.status))};
+x.onerror=function(){rej(new Error('网络错误'))};
+x.send(bmp)})}
+
+function batchItem(sn,label){
+let d=document.createElement('div');d.className='batch-item';d.id='bi-'+sn;
+d.innerHTML='<img alt=""><div class="bn"></div><div class="bs">等待…</div>';
+d.querySelector('.bn').textContent=label||sn;
+$('batch-list').appendChild(d);return d}
+function batchSet(sn,status,ok){let d=$('bi-'+sn);if(!d)return;let s=d.querySelector('.bs');s.textContent=status;s.className='bs '+(ok?'ok':'err')}
+function batchThumb(sn,url){let d=$('bi-'+sn);if(d)d.querySelector('img').src=url}
+
+let batchBusy=0;
+async function batchUpload(files){
+if(batchBusy){alert('上一批还在上传中，请稍候');return}
+batchBusy=1;
+stopThumbs();                       // 整批期间暂停缩略图，避免与上传抢 ESP32 的单线程 HTTP
+$('batch-card').style.display='block';$('batch-list').innerHTML='';
+$('preview-area').style.display='none';$('img-adjust').style.display='none';$('action-row').style.display='none';
+$('batch-progress').firstChild.style.width='0%';
+let a=getAdj(),ts=Math.floor(Date.now()/1000),okNames=[];
+/* 串行流水线：读一张 -> 抖动 -> 上传 -> 释放，内存里只留一张 BMP */
+for(let i=0;i<files.length;i++){
+let f=files[i],sn=buildSn(a,ts,i);
+batchItem(sn,f.name);
+try{
+batchSet(sn,'处理中…',1);
+let url=URL.createObjectURL(f);
+let img=await loadImgEl(url);URL.revokeObjectURL(url);
+if(!sourceCanvas){sourceCanvas=document.createElement('canvas')}
+applyScale(img,sourceCanvas);
+await runPipeline(sourceCanvas,currentImgW,currentImgH);
+batchThumb(sn,$('preview-processed').src);      // 本地即时缩略图（走校准色，贴近实际上屏效果）
+batchSet(sn,'上传中…',1);
+await postBmp(sn,processedBmp,false);            // show=0：只落盘，不重扫、不刷屏
+batchSet(sn,'已上传',1);okNames.push(sn+'.bmp');
+}catch(e){batchSet(sn,'失败：'+((e&&e.message)||e),0)}
+$('batch-progress').firstChild.style.width=((i+1)/files.length*100)+'%';
+setMsg('upload-msg','批量上传中：'+(i+1)+'/'+files.length,1);
+await new Promise(function(r){setTimeout(r,0)});  // 让出主线程，界面保持可响应
+}
+await finishBatch(okNames);
+thumbPaused=0;
+if(!okNames.length)loadThumbsSeq();   // 全失败时列表没重绘，恢复被 stopThumbs 打断的缩略图加载
+batchBusy=0}
+
+/* 整批结束后：重扫一次列表 -> 跳到新增文件所在页并高亮。
+   不再单独给每项做上屏按钮：高亮项就在下面的图片列表里，点一下缩略图即可上屏。 */
+async function finishBatch(names){
+if(!names.length){setMsg('upload-msg','本批没有成功上传的图片',0);return}
+try{
+let d=await api('GET','/api/photos?reload=1');
+thumbFiles=d.files||[];$('photo-count').textContent=thumbFiles.length;
+hlNames=new Set(names);
+let first=null;
+names.forEach(function(n){let i=thumbFiles.indexOf(n);
+if(i>=0){let p=Math.floor(i/thumbPageSize);if(first===null||p<first)first=p}});
+if(first===null){pageStore={};thumbPage=0;renderPage();
+setMsg('upload-msg','已上传 '+names.length+' 张，但列表里没找到（可手动刷新）',0);return}
+stopThumbs();thumbPaused=0;pageStore={};thumbPage=first;renderPage();
+setMsg('upload-msg','已上传 '+names.length+' 张，已跳到第 '+(first+1)+' 页并高亮，点缩略图即可上屏',1);
+}catch(e){setMsg('upload-msg','已上传 '+names.length+' 张，但刷新列表失败：'+((e&&e.message)||e),0)}}
+
 function fileChanged(){
-let f=$('file-input').files[0];if(!f)return;
-if(!f.type.startsWith('image/')){alert('请选择图片文件');return}
+let files=Array.prototype.slice.call($('file-input').files||[]);
+$('file-input').value='';
+if(!files.length)return;
+files=files.filter(function(f){return f.type.indexOf('image/')===0});
+if(!files.length){alert('请选择图片文件');return}
+if(files.length===1){singleFile(files[0]);return}
+batchUpload(files)}
+
+function singleFile(f){
+$('batch-card').style.display='none';
 $('preview-area').style.display='grid';$('img-adjust').style.display='block';$('action-row').style.display='flex';
 $('upload-msg').textContent='处理中...';rotateAngle=0;
 let img=new Image();img.onload=async function(){
 lastOrigImg=img;$('preview-orig').src=img.src;
 await reprocess()};
-img.src=URL.createObjectURL(f);$('file-input').value=''}
+img.src=URL.createObjectURL(f)}
 function applyScale(img,canvas){
 var m=$('adj-scale').value,d=$('adj-dir').value;
 var tw=800,th=480;
@@ -527,10 +661,7 @@ img.src=URL.createObjectURL(new Blob([processedBmp],{type:'image/bmp'}))}
 function uploadPhoto(){
 if(!processedBmp||!fileFlag){alert('请先选择图片');return}
 let p=$('upload-progress');p.style.display='block';
-let pipeAbbr={epdoptimize:'epd',opendisplay:'od'};
-let ditAbbr={floydSteinberg:'fs',atkinson:'at',jarvis:'jjn',stucki:'sk',burkes:'bk',sierra3:'s3',sierra2:'s2'};
-let a=getAdj();
-let sn=(pipeAbbr[a.pipe]||a.pipe)+'_'+(ditAbbr[a.dither]||a.dither)+'_'+a.br+'_'+a.ct+'_'+a.st+'_'+a.sh+'_'+a.df+'_'+Math.floor(Date.now()/1000);
+let sn=buildSn(getAdj(),Math.floor(Date.now()/1000));
 let q='?name='+encodeURIComponent(sn);
 let x=new XMLHttpRequest();x.open('POST','/api/upload'+q);
 x.upload.onprogress=function(e){p.firstChild.style.width=(e.loaded/e.total*100)+'%'};
@@ -555,8 +686,9 @@ window.saveAdjusted=saveAdjusted;window.loadAdjusted=loadAdjusted;
 window.fileChanged=fileChanged;window.onPipeChange=onPipeChange;window.onAdjust=onAdjust;
 window.onScaleChange=onScaleChange;window.reprocess=reprocess;window.applyScale=applyScale;window.rotateImg=rotateImg;window.uploadPhoto=uploadPhoto;window.stopThumbs=stopThumbs;
 window.toggleMqttEnabled=toggleMqttEnabled;window.saveMqttSettings=saveMqttSettings;
+window.loadDirs=loadDirs;window.onDirChange=onDirChange;window.onModeChange=onModeChange;window.createDir=createDir;
 
-setInterval(updateStatus,5000);loadSettings();loadAdjusted();onScaleChange();updateStatus();refreshPhotos();
+setInterval(updateStatus,5000);loadSettings();loadDirs();loadAdjusted();onScaleChange();updateStatus();refreshPhotos();
 </script>
 </body>
 </html>

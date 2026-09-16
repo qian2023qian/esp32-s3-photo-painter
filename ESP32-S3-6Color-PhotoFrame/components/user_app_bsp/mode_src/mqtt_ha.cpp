@@ -18,8 +18,11 @@ extern uint32_t photo_img_count;
 extern uint32_t photo_img_index;
 extern int      photo_interval;
 extern bool     photo_running;
+extern char     photo_dir[];
+extern int      photo_play_mode;
 extern "C" bool photo_get_sensor(float *temp, float *rh);
 extern "C" int  photo_switch_to(uint32_t index);
+extern "C" int  photo_manual_step(int forward);
 extern "C" void photo_set_interval(int minutes);
 extern "C" void photo_set_running(bool run);
 
@@ -107,6 +110,8 @@ static void mqtt_publish_state(void)
     cJSON_AddNumberToObject(root, "img_index", photo_img_index);
     cJSON_AddNumberToObject(root, "interval", photo_interval);
     cJSON_AddBoolToObject(root, "running", photo_running);
+    cJSON_AddStringToObject(root, "dir", photo_dir);          // 当前播放目录（空=根目录）
+    cJSON_AddNumberToObject(root, "mode", photo_play_mode);   // 0=顺序 1=倒序 2=随机
 
     char *str = cJSON_PrintUnformatted(root);
     if (str) {
@@ -169,9 +174,9 @@ static void mqtt_handle_command(const char *topic, const char *data)
                 || strcmp(data, "true") == 0 || strcmp(data, "1") == 0);
         photo_set_running(on);
     } else if (strstr(topic, "/next")) {
-        if (photo_img_count > 0) photo_switch_to((photo_img_index + 1) % photo_img_count);
+        photo_manual_step(1);      // 按当前轮播方式推进（顺序/倒序/随机）
     } else if (strstr(topic, "/prev")) {
-        if (photo_img_count > 0) photo_switch_to((photo_img_index + photo_img_count - 1) % photo_img_count);
+        photo_manual_step(0);
     }
     mqtt_publish_state();
 }
