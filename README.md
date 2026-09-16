@@ -63,8 +63,7 @@ python main.py serve       # 打开 WebUI 浏览/渲染/推送
 
 本仓库自有代码以 **MIT** 许可发布，见 [`LICENSE`](LICENSE)。
 
-但仓库内含**第三方开源代码的衍生作品**（`ESP32-S3-6Color-PhotoFrame/` 源自
-xiaozhi-esp32，`AI-Photo-Picker/` 源自另一个 MIT 项目），它们各自保留原有版权与
-许可声明，**不**被重新授权；另有若干第三方组件与数据集（ESP-IDF、LVGL、
-XPowersLib、GeoNames 城市数据等）遵循其自身许可。详见 [`LICENSE`](LICENSE) 末尾的
-「注意 / Note」一节。
+仓库内含**第三方开源代码的衍生作品**（`ESP32-S3-6Color-PhotoFrame/` 源自 xiaozhi-esp32，
+`AI-Photo-Picker/` 源自另一个 MIT 项目），它们各自保留原有版权与许可声明，**不**被重新授权；
+另有若干第三方组件与数据集（ESP-IDF、LVGL、XPowersLib、GeoNames 城市数据等）遵循其自身许可。
+完整清单见 [`NOTICE.md`](NOTICE.md)。
