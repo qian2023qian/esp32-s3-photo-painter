@@ -1,0 +1,48 @@
+MIT License
+
+Copyright (c) 2026 qian2023qian
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+注意 / Note
+===========
+
+本仓库是一个多项目工作区，包含**第三方开源代码的衍生作品**，它们各自保留原有许可
+与版权声明，不受上面这份 MIT 许可的重新授权：
+
+- `ESP32-S3-6Color-PhotoFrame/` — 基于 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32)
+  （MIT，Copyright (c) 2025 Shenzhen Xinzhi Future Technology Co., Ltd.）修改，
+  并包含 Waveshare 官方新版固件的板级代码。原许可见该目录下 `LICENSE`。
+- `AI-Photo-Picker/` — 衍生自 upstream 的 MIT 项目
+  （Copyright (c) 2025 dai-hongtao）。原许可见该目录下 `LICENSE`。
+
+第三方组件与数据（各自遵循其自身许可）：
+
+- **Espressif ESP-IDF 及其托管组件** — 多数为 Apache-2.0 / MIT，通过
+  `idf_component.yml` 在构建时拉取，**未**随本仓库分发（`managed_components/` 已忽略）。
+- **LVGL** — MIT。
+- **XPowersLib**（AXP2101 驱动）— MIT，Copyright (c) Lewis He。
+- **multi_button** — MIT。
+- `AI-Photo-Picker/data/world_cities_zh.csv` — 由 [GeoNames](https://www.geonames.org/)
+  数据制作，遵循 CC BY 4.0，使用时请保留署名。
+
+如需再分发 `ConverTo6c_bmp-7.3/` 中的预编译二进制
+（`Windows/convert.exe`、`MAC/convert`），请先确认其来源与许可。
