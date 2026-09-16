@@ -1,4 +1,4 @@
-﻿# macOS
+# macOS
 .DS_Store
 # IDE
 .vscode/
@@ -30,3 +30,14 @@ dist/
 # Windows
 Thumbs.db
 Desktop.ini
+
+# 参考资料（第三方项目的工作副本，不入库）
+参考/
+
+# ConverTo6c_bmp-7.3 的预编译二进制没有许可声明，已移出仓库；
+# 这两个目录现在只剩本地残留，一并忽略（仓库内只保留 convert.py）
+ConverTo6c_bmp-7.3/MAC/
+ConverTo6c_bmp-7.3/Windows/
+
+# 本地截图
+屏幕截图*.png
