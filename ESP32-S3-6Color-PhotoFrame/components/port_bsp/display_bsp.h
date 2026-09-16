@@ -101,7 +101,7 @@ class ePaperPort {
     void Set_Mirror(uint8_t mirr_x,uint8_t mirr_y);
     uint8_t* EPD_GetIMGBuffer();
     void EPD_SetPixel(uint16_t x, uint16_t y, uint16_t color);
-    void EPD_SDcardBmpShakingColor(const char *path,uint16_t x_start, uint16_t y_start);        /*只能用于经过抖动之后的 480x800/800x480 BMP图片显示*/
+    bool EPD_SDcardBmpShakingColor(const char *path,uint16_t x_start, uint16_t y_start);        /*只能用于经过抖动之后的 480x800/800x480 BMP图片显示；返回是否成功上屏*/
     void EPD_SDcardIMGShakingColor(const char *path,uint16_t x_start, uint16_t y_start);        /*可以显示jpg,bmp,png格式图片 480x800/800x480*/
     void EPD_SDcardScaleIMGShakingColor(const char *path,uint16_t x_start, uint16_t y_start);   /*可以显示jpg,bmp,png格式图片,带自动拉伸缩放的*/
 	void EPD_DrawStringCN(uint16_t Xstart, uint16_t Ystart, const char * pString, cFONT* font,uint16_t Color_Foreground, uint16_t Color_Background);

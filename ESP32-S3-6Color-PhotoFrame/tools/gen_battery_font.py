@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""生成电量页中文字模 fontBatteryCN.c（24x25 点阵，格式对齐 font14CN.c）。
+"""生成电量页 / 状态提示页中文字模 fontBatteryCN.c（24x25 点阵，格式对齐 font14CN.c）。
 
 用法:
   python tools/gen_battery_font.py            # 生成 fontBatteryCN.c
@@ -23,9 +23,13 @@ FONT_SIZE = 23   # 所有汉字宽≤23 高≤23，无需缩放，避免笔画�
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "components/port_bsp/src/fonts/fontBatteryCN.c"
 
-# 电量页全部字符：汉字 19 个 + ASCII
+# 电量页 + 状态提示页全部字符：汉字 35 个 + ASCII 16 个
+# （提示页如“存储卡未检测到 / 请检查存储卡 / 未找到图片 / 图片读取失败”）
 CHARS_CN = ["充", "电", "状", "态", "中", "阶", "段", "池", "压",
-            "量", "恒", "流", "涓", "预", "已", "满", "未", "低", "请"]
+            "量", "恒", "流", "涓", "预", "已", "满", "未", "低", "请",
+            # ---- 状态提示页新增 ----
+            "存", "储", "卡", "检", "测", "到", "查", "找", "图", "片",
+            "上", "传", "读", "取", "失", "败"]
 CHARS_ASCII = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
                "%", "V", "m", ".", ":", " "]
 ALL = CHARS_CN + CHARS_ASCII
@@ -98,7 +102,7 @@ def to_c_bytes(mat: np.ndarray) -> list:
 
 def fmt_c_file() -> str:
     lines = ['#include "fonts.h"', "",
-             "// 电量页中文字库（由 tools/gen_battery_font.py 自动生成）",
+             "// 电量页 / 状态提示页中文字库（由 tools/gen_battery_font.py 自动生成）",
              f"// 微软雅黑 {FONT_SIZE}px，24x25 点阵；ASCII 左对齐宽≤14，汉字居中", "",
              "const CH_CN FontBatteryCN_Table[] =", "{"]
     for ch in ALL:

@@ -172,8 +172,13 @@ uint8_t User_Mode_init(void)
     Led_init();                                       /* LED Blink Initialization */
     SDPort = new CustomSDPort("/sdcard");
     uint8_t sdcard_win = SDPort->SDPort_GetSdcardInitOK();              /* SD Card Initialization */
-    if (sdcard_win == 0)
-        return 0;
+    if (sdcard_win == 0) {
+        /* SD 卡缺失/损坏时不能直接放弃初始化：否则 EventGroup、按键任务、EPD_Init()、
+           相框/小智模式全都起不来，表现为“开机毫无反应、屏幕停在旧画面、热点也搜不到”。
+           这里降级继续：相框模式会在墨水屏上给出“存储卡未检测到”提示页，
+           并照常启动 WiFi/AP 与 Web 仪表盘，方便排查和恢复。*/
+        ESP_LOGE("User_Mode_init", "SD card init failed -> degraded boot (no local photos)");
+    }
     Green_led_Mode_queue = xEventGroupCreate();
     Red_led_Mode_queue   = xEventGroupCreate();
     epaper_groups        = xEventGroupCreate();

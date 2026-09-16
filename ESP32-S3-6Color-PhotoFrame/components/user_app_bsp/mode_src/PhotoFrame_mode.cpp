@@ -133,6 +133,39 @@ extern "C" bool photo_show_battery_page(bool low)
     return true;
 }
 
+/* ---- 状态提示页文本宽度（中文 24px/字，ASCII 用字库 ASCII_Width）---- */
+static int photo_text_width_cn(const char *s)
+{
+    int w = 0;
+    while (s && *s) {
+        if ((unsigned char)*s <= 0xE0) { w += FontBatteryCN.ASCII_Width; s += 1; }
+        else                           { w += FontBatteryCN.Width;       s += 3; }
+    }
+    return w;
+}
+
+/* ---- 状态提示页（无图片 / 存储卡未挂载 / 图片读取失败）----
+   注意：调用方必须已持有 epaper_gui_semapHandle，互斥锁非递归，本函数不再重复获取 */
+static void photo_draw_status_page_locked(const char *title, const char *hint, bool warn)
+{
+    ePaperDisplay.EPD_DispClear(ColorWhite);
+
+    const int y = 170;
+    int w1 = photo_text_width_cn(title);
+    ePaperDisplay.EPD_DrawStringCN((800 - w1) / 2, y, title, &FontBatteryCN,
+                                   warn ? ColorRed : ColorBlack, ColorWhite);
+    if (hint && hint[0]) {
+        int w2 = photo_text_width_cn(hint);
+        ePaperDisplay.EPD_DrawStringCN((800 - w2) / 2, y + 46, hint, &FontBatteryCN,
+                                       ColorBlack, ColorWhite);
+    }
+
+    ePaperDisplay.Set_Rotation(2);      // 与横屏图片 / 电量页一致
+    ePaperDisplay.EPD_Display();
+    ePaperDisplay.Set_Rotation(0);
+    ESP_LOGW(TAG, "status page: %s | %s", title ? title : "", hint ? hint : "");
+}
+
 /* ---- ePaper GUI Task ---- */
 static void gui_task(void *arg)
 {
@@ -147,12 +180,24 @@ static void gui_task(void *arg)
 
         if (photoframe_list && photo_img_count > 0) {
             list_node_t *node = list_at(photoframe_list, photo_img_index);
+            bool drawn = false;
             if (node) {
                 CustomSDPortNode_t *sd_node = (CustomSDPortNode_t *)node->val;
                 ESP_LOGI(TAG, "Displaying [%lu/%lu]: %s", photo_img_index + 1, photo_img_count, sd_node->sdcard_name);
-                ePaperDisplay.EPD_SDcardBmpShakingColor(sd_node->sdcard_name, 0, 0);
-                ePaperDisplay.EPD_Display();
+                drawn = ePaperDisplay.EPD_SDcardBmpShakingColor(sd_node->sdcard_name, 0, 0);
+                if (drawn) ePaperDisplay.EPD_Display();
             }
+            if (!drawn) {
+                /* 列表里有文件但读不出来（卡被拔出 / 文件损坏 / 非 24bit BMP）：
+                   给一页可见提示，别让屏幕停在旧画面看起来像死机 */
+                photo_draw_status_page_locked("图片读取失败", "请检查存储卡", true);
+            }
+        } else {
+            /* 一张图都没有：区分“SD 未挂载”和“目录为空”，两者都给出可见提示 */
+            if (SDPort && SDPort->SDPort_GetSdcardInitOK())
+                photo_draw_status_page_locked("未找到图片", "请上传图片", false);
+            else
+                photo_draw_status_page_locked("存储卡未检测到", "请检查存储卡", true);
         }
         battery_page_dirty = true;   // 低电量态下被图片覆盖后，下个周期重新显示电量页
 
@@ -183,10 +228,20 @@ static void slideshow_task(void *arg)
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(60 * 1000));
 
-        /* 低电量检测（独立于轮播开关）：<10% 暂停轮播显示电量页，充电≥15% 恢复 */
+        /* 低电量检测（独立于轮播开关）：<10% 暂停轮播并显示电量页，充电≥15% 恢复。
+           注意：**充电中完全不做低电量处理**。
+           之前的实现只在“重显提醒”那一支加了 !charging，而“首次进入低电量”那一支没有，
+           于是开机后第一次检查（最多 60s）时，即使正在充电也会无条件刷出电量页，
+           把用户刚切换/上传的图片覆盖掉。已经插上电再提示“请充电”本身也没有意义。*/
         int pct = Custom_PmicGetBatteryPercent();
         bool charging = Custom_PmicGetCharging();
-        if (pct >= 0 && pct < LOW_BATTERY_ENTER && !low_battery_active) {
+        if (charging) {
+            if (low_battery_active) {          // 插电后立即恢复：清掉电量页并放行自动轮播
+                low_battery_active = false;
+                battery_page_dirty = false;
+                xEventGroupSetBits(epaper_groups, set_bit_button(0));
+            }
+        } else if (pct >= 0 && pct < LOW_BATTERY_ENTER && !low_battery_active) {
             // 低电量只置 low_battery_active 做“临时暂停”，不动 photo_running：
             // photo_running 是用户的自动轮播开关（会持久化），不能被临时状态顶掉
             low_battery_active = true;
@@ -195,8 +250,8 @@ static void slideshow_task(void *arg)
         } else if (low_battery_active && pct >= LOW_BATTERY_EXIT) {
             low_battery_active = false;
             xEventGroupSetBits(epaper_groups, set_bit_button(0));   // 覆盖电量页；轮播按用户开关恢复
-        } else if (low_battery_active && battery_page_dirty && !charging) {
-            // 未充电时被切图覆盖后重显提醒；充电中尊重用户手动切图，不反复刷回电量页
+        } else if (low_battery_active && battery_page_dirty) {
+            // 未充电时被切图覆盖后重显提醒（充电中不会走到这里）
             if (photo_show_battery_page(true)) battery_page_dirty = false;
         }
 
@@ -217,7 +272,7 @@ static void button_task(void *arg)
     for (;;) {
         EventBits_t even = xEventGroupWaitBits(BootButtonGroups, set_bit_all, pdTRUE, pdFALSE, pdMS_TO_TICKS(2000));
         if (get_bit_button(even, 0)) {
-            if (photo_img_count == 0) return;
+            if (photo_img_count == 0) continue;   // 无图片：保持任务存活（原来 return 会让按键任务永久退出）
             photo_img_index = (photo_img_index + 1) % photo_img_count;
             xEventGroupSetBits(epaper_groups, set_bit_button(0));
         }
@@ -260,6 +315,12 @@ void User_PhotoFrame_mode_app_init(void)
     photoframe_list = SDPort->SDPort_GetListHost();
     photo_img_count = SDPort->SDPort_GetScanListValue();
     ESP_LOGI(TAG, "SD 卡找到 %lu 张图片", photo_img_count);
+
+    /* 一张图都没有（含 SD 未挂载）时，开机就主动刷一页提示：
+       否则屏幕会一直停在断电前的旧画面，无法区分“正常运行”和“没读到卡” */
+    if (photo_img_count == 0) {
+        xEventGroupSetBits(epaper_groups, set_bit_button(0));
+    }
 
     // Init WiFi (STA try first, AP fallback)
     wifi_manager_init();
