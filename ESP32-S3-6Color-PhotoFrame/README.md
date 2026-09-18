@@ -128,7 +128,7 @@ idf.py -p COMx flash monitor
 | 图片列表 | 分页（`pageStore` 缓存已访问页，翻回秒开）；缩略图 400px 降采样顺序加载 |
 | 图像调节 | 亮度 / 对比度 / 饱和度 / 锐化 / 抖动矩阵 / 扩散强度（实时） |
 | 双管线 | epdoptimize / OpenDisplay 一键切换，并排对比 |
-| 轮播设置 | 修改切换间隔（分钟）＋ 自动轮播开关（**开关点一下就立即存入 NVS**，断电/重启后仍保持） |
+| 轮播设置 | 修改切换间隔（**时:分** 格式，如 `01:30`）＋ 自动轮播开关（**开关点一下就立即存入 NVS**，断电/重启后仍保持） |
 | 播放目录 | 下拉选择 `/sdcard/photos/` 下的分类目录（或根目录）；旁边可**新建分类目录**，见 [分类目录与轮播方式](#分类目录与轮播方式) |
 | 轮播方式 | 顺序 / 倒序 / 随机，切换后立即生效并持久化 |
 | 休眠时段 | 设置开始 / 结束时间 |
@@ -252,7 +252,7 @@ idf.py -p COMx flash monitor
 | POST | `/api/upload` | 上传图片（raw BMP，`?name=` 指定；**写入当前播放目录**）。加 `&show=0` 则只落盘、不重扫不上屏（批量上传用） |
 | POST | `/api/delete` | 删除图片 `{"name"}`（按当前播放目录解析） |
 | GET/POST | `/api/adjustments` | 读取 / 保存图像调节参数 |
-| POST | `/api/settings` | 保存设置 `{"interval","running","sleep_start","sleep_end","dir","mode"}` |
+| POST | `/api/settings` | 保存设置 `{"interval","running","sleep_start","sleep_end","dir","mode"}`（`interval` 单位是**分钟** 1~1440；仪表盘上按 时:分 显示） |
 | POST | `/api/switch` | 切换到指定序号图片（15 秒冷却） |
 | POST | `/api/reboot` | 重启 |
 | GET | `/lib/epdoptimize.js` / `/lib/opendisplay.js` | 前端渲染 bundle |
@@ -345,7 +345,8 @@ ESP32-S3-6Color-PhotoFrame/
 **命名与协议**
 
 - NVS 键拼写为 `PhotPainterMode`（**少一个 `o`**），历史遗留，不要改成 `PhotoPainterMode`。
-- 轮播间隔单位是**分钟**（代码 `* 60 * 1000` 转毫秒）；小智的 `imgsetTimerloop` 才区分分/时。
+- 轮播间隔在**界面上是「时:分」格式**（如 `01:30`），但 HTTP 接口、NVS 与固件内部一律是**分钟**（`interval`，钳制 1~1440）。改格式只动表示层，不涉及数据迁移；输入框里只填数字时按分钟理解（兼容原来填 `60` 的习惯）。
+- 小智模式的 `imgsetTimerloop min` / `h` 是**另一套**间隔（小智模式自己的轮播定时），才区分分/时。
 - 图片切换有 **15 秒冷却**（`photo_switch_to` 用 `esp_timer_get_time()` 微秒内部时钟，不依赖 NTP 对时）。
 - 墨水屏刷新受 `epaper_gui_semapHandle` 互斥/信号量保护；图片切换经 `epaper_groups` EventGroup 触发。
 
@@ -355,7 +356,7 @@ ESP32-S3-6Color-PhotoFrame/
 - **自动轮播开关点一下即保存**：前端立刻 `POST /api/settings {running:...}`，不需要再点「保存设置」，断电或重启后状态保持。
 - 服务端落盘调用 `photo_persist_settings()` 写**完整规范状态**而不是请求原文——否则只改 `running` 的局部更新会把 `interval` / `sleep_*` 一起覆盖掉。
 - `photo_running` **只表示用户开关**（持久化）；低电量暂停是临时状态 `low_battery_active`，不写 NVS，也**不会**被写进 NVS 覆盖用户开关。
-- `interval` 在服务端钳制到 1~1440 分钟，与仪表盘输入框范围一致。
+- `interval` 在服务端钳制到 1~1440 分钟；仪表盘输入框以 **时:分** 呈现（范围 00:01~24:00），两者范围一致。
 
 **低电量提醒 / 充电**
 
