@@ -186,7 +186,7 @@ details{margin-bottom:4px}
 
 <details style="margin-bottom:8px" open>
 <summary>相框设置</summary>
-<div class="info-row"><span class="key">轮播间隔 (时:分)</span><input id="set-interval" type="text" placeholder="01:30" style="width:96px;margin:0" oninput="window.updateIntervalHint()"><span id="interval-hint" style="font-size:12px;color:var(--muted);margin-left:8px"></span></div>
+<div class="info-row"><span class="key">轮播间隔</span><input id="set-interval-h" type="number" min="0" max="24" style="width:62px;margin:0" oninput="window.updateIntervalHint()"><span style="color:var(--muted);font-size:13px;margin:0 5px">时</span><input id="set-interval-m" type="number" min="0" max="59" style="width:62px;margin:0" oninput="window.updateIntervalHint()"><span style="color:var(--muted);font-size:13px;margin-left:5px">分</span><span id="interval-hint" style="font-size:12px;color:var(--muted);margin-left:8px"></span></div>
 <div class="toggle-row"><span class="key">自动轮播</span><span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span></div>
 <div class="info-row"><span class="key">播放目录</span><select id="set-dir" onchange="window.onDirChange()" style="width:170px;margin:0"></select></div>
 <div class="info-row"><span class="key">轮播方式</span><select id="set-mode" onchange="window.onModeChange()" style="width:170px;margin:0">
@@ -345,26 +345,32 @@ api('POST','/api/wifi/connect',{ssid:s,password:p}).then(function(d){setMsg('wif
 function resetWifi(){if(!confirm('确定重置WiFi？'))return;
 api('POST','/api/wifi/reset').then(function(){setMsg('wifi-msg','已重置，AP已重启',1);$('wifi-details').open=true})}
 
-/* ---- 轮播间隔：界面用「时:分」，而 HTTP 接口与 NVS 仍用分钟（避免迁移） ---- */
+/* ---- 轮播间隔：界面用「时」「分」两个数字输入框，HTTP 接口与 NVS 仍用分钟 ----
+   用户不需要输入冒号；手机上两个框都会弹数字键盘。 */
 function minutesToHM(m){m=parseInt(m,10);if(!isFinite(m)||m<0)m=0;
 return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')}
-function hmToMinutes(s){
-s=String(s==null?'':s).trim().replace(/：/g,':');      // 全角冒号也接受
-if(!s)return NaN;
-let m;
-if((m=s.match(/^\d{1,4}$/)))return parseInt(m[0],10);   // 只填数字时按分钟理解（兼容原来填 60 的习惯）
-if((m=s.match(/^(\d{1,2}):(\d{1,2})$/)))return parseInt(m[1],10)*60+parseInt(m[2],10);
-return NaN}
 function clampInterval(v){if(!isFinite(v))return null;if(v<1)v=1;if(v>1440)v=1440;return Math.round(v)}
+function intervalInputsToMinutes(){
+let h=parseInt($('set-interval-h').value,10),mi=parseInt($('set-interval-m').value,10);
+if(!isFinite(h)||h<0)h=0; if(!isFinite(mi)||mi<0)mi=0;
+return h*60+mi}
+function setIntervalInputs(m){
+/* 取不到值时兜底 60 分钟：注意 isFinite(null) 为 true，必须显式判空，
+   否则会落到“1 分钟”——那是最不该出现的值（墨水屏每分钟整屏刷新） */
+if(m===null||m===undefined||!isFinite(m))m=60;
+m=clampInterval(m);
+$('set-interval-h').value=Math.floor(m/60);$('set-interval-m').value=m%60}
 function updateIntervalHint(){
-let h=$('interval-hint');if(!h)return;
-let c=clampInterval(hmToMinutes($('set-interval').value));
-h.textContent=(c===null)?'格式 时:分，如 01:30':('= '+c+' 分钟')}
+let el=$('interval-hint');if(!el)return;
+let raw=intervalInputsToMinutes();
+if(raw<1){el.textContent='至少 1 分钟';return}
+el.textContent='= '+clampInterval(raw)+' 分钟'}
 function saveSettings(){
-let iv=clampInterval(hmToMinutes($('set-interval').value));
-if(iv===null){setMsg('set-msg','轮播间隔格式应为 时:分（如 01:30），范围 00:01~24:00',0);return}
-$('set-interval').value=minutesToHM(iv);updateIntervalHint();
-api('POST','/api/settings',{interval:iv,running:$('set-running').classList.contains('on'),sleep_start:$('set-sleep-start').value,sleep_end:$('set-sleep-end').value}).then(function(d){setMsg('set-msg','已保存（轮播间隔 '+minutesToHM(iv)+'）',1)}).catch(function(){setMsg('set-msg','保存失败',0)})}
+let raw=intervalInputsToMinutes();
+if(raw<1){setMsg('set-msg','轮播间隔至少 1 分钟（「时」和「分」不能同时为 0）',0);return}
+let iv=clampInterval(raw);
+setIntervalInputs(iv);updateIntervalHint();      // 归一化：如 0时90分 -> 1时30分，25时 -> 24时
+api('POST','/api/settings',{interval:iv,running:$('set-running').classList.contains('on'),sleep_start:$('set-sleep-start').value,sleep_end:$('set-sleep-end').value}).then(function(d){setMsg('set-msg','已保存（轮播间隔 '+minutesToHM(iv)+'，即 '+iv+' 分钟）',1)}).catch(function(){setMsg('set-msg','保存失败',0)})}
 function updateToggle(on){let t=$('set-running');if(on){t.classList.add('on')}else{t.classList.remove('on')}}
 function toggleRunning(){let t=$('set-running');t.classList.toggle('on');let on=t.classList.contains('on');
 // 立即落盘到 NVS，无需再点“保存设置”，断电/重启后仍保持开关状态
@@ -391,7 +397,7 @@ function createDir(){let n=($('new-dir').value||'').trim();if(!n)return setMsg('
 api('POST','/api/mkdir',{name:n}).then(function(d){
 if(d&&d.ok){$('new-dir').value='';setMsg('set-msg',(d.existed?'目录已存在：':'已创建目录：')+n,1);loadDirs()}
 else{setMsg('set-msg',(d&&d.msg)||'创建失败',0)}}).catch(function(){setMsg('set-msg','创建失败',0)})}
-function loadSettings(){api('GET','/api/status').then(function(d){$('set-interval').value=minutesToHM(d.interval);updateIntervalHint();updateToggle(d.running);if(d.mode!==undefined)$('set-mode').value=String(d.mode);if(d.sleep_start)$('set-sleep-start').value=d.sleep_start;if(d.sleep_end)$('set-sleep-end').value=d.sleep_end;if(d.mqtt){updateMqttToggle(d.mqtt.enabled);$('set-mqtt-host').value=d.mqtt.host||'';$('set-mqtt-port').value=d.mqtt.port||1883;$('set-mqtt-user').value=d.mqtt.username||''}})}
+function loadSettings(){api('GET','/api/status').then(function(d){setIntervalInputs(d.interval);updateIntervalHint();updateToggle(d.running);if(d.mode!==undefined)$('set-mode').value=String(d.mode);if(d.sleep_start)$('set-sleep-start').value=d.sleep_start;if(d.sleep_end)$('set-sleep-end').value=d.sleep_end;if(d.mqtt){updateMqttToggle(d.mqtt.enabled);$('set-mqtt-host').value=d.mqtt.host||'';$('set-mqtt-port').value=d.mqtt.port||1883;$('set-mqtt-user').value=d.mqtt.username||''}})}
 function toggleMqttEnabled(){var t=$('set-mqtt-enabled');t.classList.toggle('on')}
 function updateMqttToggle(on){var t=$('set-mqtt-enabled');if(on){t.classList.add('on')}else{t.classList.remove('on')}}
 function saveMqttSettings(){
