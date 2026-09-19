@@ -464,7 +464,8 @@ static esp_err_t api_settings_post(httpd_req_t *req)
 
     item = cJSON_GetObjectItem(json, "dir");
     if (item && cJSON_IsString(item)) {
-        /* 目录切换有副作用（重扫、重置索引与随机序、立刻上屏），交给 photo_set_dir 处理；
+        /* 目录切换有副作用（重扫列表、重置索引与随机序），交给 photo_set_dir 处理；
+           它**不刷屏** —— 切目录只改接下来播哪批图，不顶掉正在看的画面。
            空串表示根目录。名字非法时 photo_set_dir 会忽略并保留原目录。 */
         const char *nd = item->valuestring;
         if ((nd[0] == '\0' || dir_name_ok(nd)) && strcmp(nd, photo_dir) != 0) {

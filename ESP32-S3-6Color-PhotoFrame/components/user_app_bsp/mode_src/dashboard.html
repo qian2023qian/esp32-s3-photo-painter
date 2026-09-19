@@ -503,6 +503,7 @@ let opts={method:method,headers:{}};if(body){opts.headers['Content-Type']='appli
 let r=await fetch(path,opts);return r.status<400?r.json():Promise.reject(r)}
 
 var chgMap={"Tri_Charge":"涓流充电","Pre_Charge":"预充电","Constant_Charge":"恒流充电","Constant_Voltage":"恒压充电","Charge_Done":"已充满","Not_Charging":"未充电"};
+var wifiPanelInit=0;
 function updateStatus(){
 api('GET','/api/status').then(function(d){
 let tag=$('wifi-tag');tag.textContent='WiFi: '+(d.wifi?'已连接':'未连接');
@@ -514,7 +515,9 @@ $('batt-chg').textContent=d.charging?'充电中':(chgMap[d.charge_status]||'--')
 $('img-count').textContent=d.img_count;$('img-index').textContent=d.img_index;updateNowPhoto();
 $('img-interval').textContent=minutesToHM(d.interval);$('img-running').textContent=d.running?'运行中':'已暂停';
 $('s-temp').textContent=d.temperature.toFixed(1);$('s-rh').textContent=d.humidity.toFixed(1);
-if(d.wifi){$('wifi-details').open=false}
+/* WiFi 配网面板只在首次拿到状态时自动开合一次；
+   之前每次轮询都强制 open=false，会把用户正在操作的下拉栏顶回去 */
+if(!wifiPanelInit){wifiPanelInit=1;$('wifi-details').open=!d.wifi}
 if(!adjLoaded&&d.img_adj){
 let a=typeof d.img_adj==='string'?JSON.parse(d.img_adj):d.img_adj;
 if(a.br!==undefined)$('adj-br').value=a.br;

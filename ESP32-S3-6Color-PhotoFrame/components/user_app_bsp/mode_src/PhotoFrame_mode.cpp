@@ -191,7 +191,9 @@ extern "C" void photo_rescan_current_dir(void)
     ESP_LOGI(TAG, "播放目录 %s : %lu 张", path, photo_img_count);
 }
 
-/* 切换播放目录（dir 为空 = 根目录）。重扫 + 持久化 + 立刻上屏 */
+/* 切换播放目录（dir 为空 = 根目录）。重扫 + 持久化，但**不刷屏**：
+   切目录只是改变接下来播放哪一批图，不应该把用户正在看的画面顶掉
+   （想立刻看到新目录的图，等下一次轮播或按 BOOT 短按切图即可） */
 extern "C" void photo_set_dir(const char *dir)
 {
     char clean[sizeof(photo_dir)] = "";
@@ -204,7 +206,6 @@ extern "C" void photo_set_dir(const char *dir)
     photo_img_index = 0;
     photo_rescan_current_dir();
     photo_persist_settings();
-    xEventGroupSetBits(epaper_groups, set_bit_button(0));
 }
 
 /* 设置轮播方式（0=顺序 1=倒序 2=随机） */
