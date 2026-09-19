@@ -4,218 +4,470 @@
 // Edit dashboard.html instead
 static const char *WEB_INDEX_HTML = R"END===="(
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PhotoPainter</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fdfbf5">
+<title>PhotoPainter &#30456;&#26694;&#25511;&#21046;&#21488;</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0d1117;--card:#161b22;--cell:#0d1117;--border:#21262d;--muted:#8b949e}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#c9d1d9;margin:0 auto;padding:12px;width:100%;display:flex;justify-content:center}
-.dash{width:100%}
-.dash{display:grid;gap:10px}
-.topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--card);border-radius:10px}
-.topbar h1{font-size:clamp(14px,2.5vw,20px);font-weight:600}
-.wifi-tag{font-size:clamp(10px,1.5vw,13px);padding:3px 8px;border-radius:5px;white-space:nowrap}
-.wifi-on{background:#238636;color:#fff}
-.wifi-off{background:#30363d;color:var(--muted)}
-.batt-low{background:#f85149;color:#fff}
-.card{background:var(--card);border-radius:10px;padding:clamp(10px,1.5vw,18px)}
-.card h2{font-size:clamp(12px,1.8vw,15px);color:var(--muted);margin-bottom:10px;font-weight:500}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.cell{background:var(--cell);border-radius:8px;padding:clamp(6px,1vw,12px);text-align:center}
-.cell .val{font-size:clamp(20px,4vw,36px);font-weight:bold;line-height:1.2}
-.cell .unit{font-size:clamp(11px,1.5vw,14px);color:var(--muted)}
-.cell .lbl{font-size:clamp(12px,1.5vw,15px);color:var(--muted);margin-bottom:3px;font-weight:500}
-.val-green{color:#3fb950}
-.val-blue{color:#58a6ff}
-.val-red{color:#f85149}
-.compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
-.compare img{width:100%;height:220px;object-fit:contain;border-radius:6px;border:1px solid var(--border)}
-.compare .label{font-size:11px;color:var(--muted);text-align:center;margin-top:2px}
-.info-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:clamp(12px,1.3vw,14px);border-bottom:1px solid var(--border)}
-.info-row:last-child{border-bottom:none}
-.info-row .key{color:var(--muted)}
-.btn-row{display:flex;gap:6px;flex-wrap:wrap}
-input{width:100%;padding:8px 10px;border-radius:6px;border:1px solid #30363d;background:var(--bg);color:#c9d1d9;font-size:clamp(12px,1.3vw,14px);margin-bottom:6px;outline:none}
-input:focus{border-color:#58a6ff}
-input[type=time]{padding:4px 8px;width:auto;margin:0}
-.btn{padding:clamp(6px,1vw,10px) clamp(10px,1.5vw,18px);border:none;border-radius:6px;cursor:pointer;font-size:clamp(12px,1.3vw,14px);font-weight:600;white-space:nowrap}
-.btn-blue{background:#1f6feb;color:#fff}.btn-blue:hover{background:#388bfd}
-.btn-red{background:#da3633;color:#fff}.btn-red:hover{background:#f85149}
-.btn-green{background:#238636;color:#fff}
-.btn-purple{background:#8250df;color:#fff}
-.btn-sm{padding:2px 8px;font-size:11px}
-.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:14px}
-.toggle-row .key{color:var(--muted)}
-.toggle-sw{width:44px;height:24px;background:#30363d;border-radius:12px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
-.toggle-sw.on{background:#238636}
-.toggle-sw::after{content:'';width:18px;height:18px;background:#c9d1d9;border-radius:50%;position:absolute;top:3px;left:3px;transition:left .2s}
-.toggle-sw.on::after{left:23px}
-input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;background:transparent;outline:none;margin:0;cursor:pointer;touch-action:none}
-input[type=range]::-webkit-slider-runnable-track{height:8px;background:#30363d;border-radius:4px}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;background:#58a6ff;border-radius:50%;margin-top:-7px;cursor:pointer;border:none}
-input[type=range]::-moz-range-track{height:8px;background:#30363d;border-radius:4px;border:none}
-input[type=range]::-moz-range-thumb{width:22px;height:22px;background:#58a6ff;border-radius:50%;border:none;cursor:pointer}
-select{padding:6px 8px;border-radius:6px;border:1px solid #30363d;background:var(--bg);color:#c9d1d9;font-size:13px;outline:none}
-.adjust-val{width:42px;text-align:right;font-size:12px;color:var(--muted);flex-shrink:0}
-.ssid-item{padding:8px 10px;background:var(--cell);border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:clamp(11px,1.2vw,14px)}
-.ssid-item:hover{background:#1f2a3a}
-.msg{font-size:clamp(10px,1.1vw,13px);margin-top:6px}
-.msg-ok{color:#3fb950}
-.msg-err{color:#f85149}
-.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;max-height:300px;overflow-y:auto;padding:4px 0}
-.photo-item{cursor:pointer;text-align:center;background:var(--cell);border-radius:6px;padding:4px;position:relative;transition:background .15s}
-.photo-item:hover{background:#1f2a3a}
-.photo-item img{width:100%;aspect-ratio:800/480;object-fit:contain;border-radius:3px;display:block;background:#1a1a2e}
-.photo-item .pname{font-size:9px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.photo-item .del{position:absolute;top:2px;right:2px;background:#da3633;color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:14px;cursor:pointer;display:none}
-.photo-item:hover .del{display:block}
-	.photo-pager{grid-column:1/-1;display:flex;gap:4px;justify-content:center;padding:6px 0;flex-wrap:wrap}
-	.pager-num{display:inline-block;padding:4px 10px;background:var(--cell);border-radius:4px;cursor:pointer;font-size:12px;color:var(--muted);min-width:28px;text-align:center}
-	.pager-num:hover{background:#1f2a3a}
-	.pager-on{background:#1f6feb!important;color:#fff!important}
-	.pager-arr{display:inline-block;padding:4px 8px;background:var(--cell);border-radius:4px;cursor:pointer;font-size:12px;color:var(--muted);min-width:24px;text-align:center}
-	.pager-arr:hover{background:#1f2a3a}
-	.pager-dis{opacity:0.3;cursor:default;pointer-events:none}
-@media(min-width:768px){.photo-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));max-height:400px}}
-details summary{font-size:clamp(12px,1.5vw,15px);color:var(--muted);cursor:pointer;padding:4px 0}
-details{margin-bottom:4px}
-.upload-zone{border:2px dashed #30363d;border-radius:8px;padding:20px;text-align:center;cursor:pointer;margin:8px 0}
-.upload-zone:hover{border-color:#58a6ff}
-#upload-progress{display:none;height:4px;background:#30363d;border-radius:2px;margin:6px 0}
-#upload-progress div{height:100%;background:#238636;border-radius:2px;width:0}
-.photo-item.photo-hl{outline:2px solid #3fb950;box-shadow:0 0 0 3px rgba(63,185,80,.28)}
-#batch-card{display:none;margin-top:8px}
-#batch-progress{height:6px;background:#21262d;border-radius:3px;overflow:hidden;margin:6px 0}
-#batch-progress>div{height:100%;width:0;background:linear-gradient(90deg,#238636,#3fb950);transition:width .2s}
-.batch-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;max-height:320px;overflow-y:auto}
-.batch-item{background:var(--cell);border:1px solid #30363d;border-radius:6px;padding:4px;text-align:center}
-.batch-item img{width:100%;height:62px;object-fit:contain;background:#1a1a2e;border-radius:3px;display:block}
-.batch-item .bn{font-size:9px;color:var(--muted);margin:3px 0 1px;word-break:break-all;line-height:1.2}
-.batch-item .bs{font-size:9px;color:#8b949e}
-.batch-item .bs.ok{color:#3fb950}
-.batch-item .bs.err{color:#f85149}
-@media(min-width:768px){body{padding:16px}.dash{max-width:640px}.compare img{height:340px}}
-@media(min-width:1024px){body{padding:20px}.dash{max-width:1100px}.compare img{height:400px}}
+/* ==========================================================================
+   PhotoPainter 控制台 —— 新粗野主义（Neo-brutalism）
+   3px 纯黑边框 + 硬投影、满饱和的墨水屏六色、方格纸底纹
+   响应式：<641 底部页签 / 641~1399 顶部导航 + 单栏 / >=1400 左侧栏 + 两栏
+   ========================================================================== */
+:root{
+  --paper:#fdfbf5; --ink:#0a0a0a; --ink2:#5b5b5b; --muted:#5b5b5b;
+  --y:#ffd400; --r:#ff4438; --b:#2f6bff; --g:#19c37d;
+  --bd:3px; --sh:6px 6px 0 var(--ink); --sh-sm:4px 4px 0 var(--ink);
+  --sans:"Segoe UI",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --maxw:1600px; --navh:60px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{font:16px/1.5 var(--sans);color:var(--ink);background:var(--paper);
+  background-image:linear-gradient(rgba(10,10,10,.045) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(10,10,10,.045) 1px,transparent 1px);
+  background-size:22px 22px;
+  padding-bottom:calc(var(--navh) + 2px + env(safe-area-inset-bottom,0px))}
+button,input,select{font:inherit;color:inherit}
+img{max-width:100%;display:block}
+.hidden{display:none!important}
+.tape{height:12px;background:repeating-linear-gradient(90deg,
+  var(--ink) 0 26px,#fff 26px 52px,var(--y) 52px 78px,var(--r) 78px 104px,
+  var(--b) 104px 130px,var(--g) 130px 156px);border-bottom:var(--bd) solid var(--ink)}
+
+/* ---------- 版心：width:100% 不可省 —— main 是 grid 子项，带 auto 外边距时
+   不写 width:100% 会收缩成内容的 fit-content 宽度（宽屏下只剩几百 px） ---------- */
+main{width:100%;max-width:var(--maxw);margin:0 auto;padding:22px 18px 60px;min-width:0}
+@media(min-width:641px){main{padding:26px 26px 70px}}
+@media(min-width:1400px){.shell{display:grid;grid-template-columns:250px minmax(0,1fr)}
+  main{padding:34px 46px 80px;margin:0 auto}}
+
+/* ---------- 区块 ---------- */
+.blk{background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh)}
+.pad{padding:18px}
+h2.sec{display:inline-block;font:900 15px/1 var(--sans);letter-spacing:2.6px;text-transform:uppercase;
+  background:var(--ink);color:#fff;padding:9px 13px;margin:34px 0 14px}
+h2.sec.y{background:var(--y);color:var(--ink)}
+h2.sec.r{background:var(--r);color:#fff}
+h2.sec:first-child{margin-top:0}
+.hd{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:8px}
+.hd h1{font:900 clamp(34px,7vw,58px)/0.95 var(--sans);letter-spacing:-1.5px;text-transform:uppercase}
+.hd .rt{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font:700 12px/1.8 var(--mono);text-align:right}
+
+/* ---------- 顶部状态徽章（JS 会改 class：wifi-on / wifi-off / batt-low） ---------- */
+.wifi-tag{display:inline-block;border:var(--bd) solid var(--ink);background:#fff;
+  padding:6px 10px;font:800 12px var(--sans);white-space:nowrap}
+.wifi-on{background:var(--g)}
+.wifi-off{background:#fff;color:var(--ink2)}
+.batt-low{background:var(--r);color:#fff}
+
+/* ---------- 数据块 ---------- */
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.tile{background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);padding:14px;min-width:0}
+.tile .l{font:800 11px/1 var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2)}
+.tile .v{font:900 clamp(26px,5vw,36px)/1 var(--sans);margin-top:8px;letter-spacing:-1px;
+  display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums}
+.tile .v span{font:700 13px var(--sans)}
+.tile.hi{background:var(--y)}
+.tile.hi2{background:var(--g);color:#04231a}
+@media(min-width:641px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* ---------- 按钮 ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;
+  background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);cursor:pointer;
+  font:800 15px var(--sans);letter-spacing:.3px;transition:transform .06s,box-shadow .06s;text-transform:uppercase}
+.btn:hover{background:var(--y)}
+.btn:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--ink)}
+.btn.g{background:var(--g);color:#04231a}
+.btn.b{background:var(--b);color:#fff}
+.btn.r{background:var(--r);color:#fff}
+.btn.sm{min-height:38px;font-size:13px;padding:0 12px;box-shadow:3px 3px 0 var(--ink)}
+.btn.wide{width:100%}
+.btnrow{display:flex;gap:14px;flex-wrap:wrap}
+.btnrow .btn{flex:1 1 auto}
+
+/* ---------- 表单 ---------- */
+.f{display:block;margin-bottom:16px;min-width:0}
+.f>span.k,.info-row .key{font:800 11px/1 var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2)}
+.f>span.k{display:block;margin-bottom:7px}
+input[type=text],input[type=password],input[type=number],input[type=time],select{
+  width:100%;min-width:0;height:44px;padding:0 12px;background:#fff;color:var(--ink);
+  border:var(--bd) solid var(--ink);outline:none;appearance:none;font-weight:700}
+input:focus,select:focus{background:#fffbe6;box-shadow:var(--sh-sm)}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 19px,calc(100% - 12px) 19px;background-size:6px 6px,6px 6px;
+  background-repeat:no-repeat;padding-right:36px}
+.info-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;min-width:0}
+.info-row .key{flex:0 0 auto;min-width:88px}
+.info-row>input,.info-row>select{flex:1 1 140px;width:auto}
+.adjust-val{font:800 13px var(--mono);color:var(--ink2);min-width:40px;text-align:right}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1 1 120px;min-width:0;height:34px;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:10px;background:#fff;border:2px solid var(--ink)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:26px;background:var(--ink);
+  margin-top:-10px;border:2px solid var(--ink)}
+.toggle-sw{position:relative;width:64px;height:34px;border:var(--bd) solid var(--ink);background:#fff;
+  cursor:pointer;flex:0 0 auto}
+.toggle-sw:after{content:"";position:absolute;top:2px;left:2px;width:24px;height:24px;background:var(--ink);transition:.14s}
+.toggle-sw.on{background:var(--g)}
+.toggle-sw.on:after{left:32px}
+.toggle-row{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+.toggle-row .key{font:800 11px/1 var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2);flex:1}
+
+/* 时 / 分：内容变宽后小控件不该跟着拉长，故给每侧上限 */
+/* 手机上两栏用 1fr（可收缩、不溢出）；只有 >=641 才把每侧上限压到 200px，
+   避免宽屏下步进器被拉成超宽空盒子。固定上限写在窄屏会溢出，务必放在媒体查询里 */
+.time{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;
+  gap:10px;align-items:end;margin-top:6px}
+@media(min-width:641px){
+  .time{grid-template-columns:minmax(0,200px) auto minmax(0,200px) auto;justify-content:start}
+  .seg{max-width:580px}.btn.wide{max-width:420px}
+  .info-row>input,.info-row>select,.f>input,.f>select{max-width:580px}}
+.step{display:flex;border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh-sm);min-width:0}
+.step input{flex:1;width:auto;min-width:0;height:52px;border:0;background:transparent;text-align:center;
+  font:900 24px var(--sans);appearance:textfield;font-variant-numeric:tabular-nums}
+.step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.step button{width:46px;height:52px;flex:0 0 auto;border:0;background:transparent;cursor:pointer;font:900 22px var(--sans)}
+.step button:hover{background:var(--y)}
+.step button:first-child{border-right:2px solid var(--ink)}
+.step button:last-child{border-left:2px solid var(--ink)}
+.time .u{font:800 12px var(--sans);letter-spacing:1px;text-transform:uppercase;padding-bottom:18px}
+.hint{display:inline-block;font:800 12px var(--mono);background:var(--b);color:#fff;padding:5px 9px}
+
+/* ---------- 图片网格：JS 生成 .photo-item / .pname / .del / .photo-pager ---------- */
+#photo-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media(min-width:641px){#photo-list{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:1400px){#photo-list{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.photo-item{border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh-sm);cursor:pointer;
+  min-width:0;position:relative;transition:transform .08s,box-shadow .08s}
+.photo-item:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 var(--ink)}
+.photo-item img{aspect-ratio:1;width:100%;object-fit:cover;border-bottom:2px solid var(--ink);background:#eee}
+.photo-item .pname{display:block;padding:6px 8px;font:800 11px var(--mono);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.photo-item.photo-hl{background:var(--y)}
+.photo-item .del{position:absolute;top:4px;right:4px;width:26px;height:26px;border:2px solid var(--ink);
+  background:#fff;cursor:pointer;font:900 13px/1 var(--sans);padding:0}
+.photo-item .del:hover{background:var(--r);color:#fff}
+.photo-pager{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.pager-num,.pager-arr{min-width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;
+  border:var(--bd) solid var(--ink);background:#fff;font:800 14px var(--mono);cursor:pointer;
+  box-shadow:3px 3px 0 var(--ink)}
+.pager-num.pager-on{background:var(--ink);color:#fff}
+.pager-arr.pager-dis{opacity:.35;cursor:default}
+
+/* ---------- 上传 ---------- */
+.upl{border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh);margin-bottom:24px}
+.upl>summary{padding:14px 16px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;
+  align-items:center;font:900 17px var(--sans);letter-spacing:.4px;text-transform:uppercase;background:var(--y)}
+.upl>summary::-webkit-details-marker{display:none}
+.upl>summary:after{content:"\25BC";font-size:12px}
+.upl[open]>summary:after{content:"\25B2"}
+.uplbody{padding:18px}
+.upload-zone{border:var(--bd) dashed var(--ink);background:#fffbe6;padding:26px 16px;text-align:center;cursor:pointer}
+.upload-zone:hover{background:var(--y)}
+.upload-zone .t{font:900 19px var(--sans);text-transform:uppercase;letter-spacing:.5px}
+.upload-zone .s{font:700 13px var(--sans);margin-top:6px;color:var(--ink2)}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:18px}
+.cmp figure{border:var(--bd) solid var(--ink);background:#fff;padding:10px;min-width:0}
+.cmp img{aspect-ratio:4/3;width:100%;object-fit:contain;border:2px solid var(--ink);background:#fff}
+.cmp figcaption{margin-top:9px;font:900 11px var(--sans);letter-spacing:1.4px;text-transform:uppercase}
+.prog{height:16px;border:var(--bd) solid var(--ink);background:#fff;margin:14px 0;overflow:hidden}
+.prog>div{height:100%;width:0;background:repeating-linear-gradient(45deg,var(--g) 0 8px,#0f9c63 8px 16px);
+  transition:width .2s}
+.blist{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.batch-item{display:flex;align-items:center;gap:12px;border:2px solid var(--ink);background:#fff;padding:8px 10px;min-width:0}
+.batch-item img{width:38px;height:38px;flex:0 0 auto;border:2px solid var(--ink);object-fit:cover;background:#eee}
+.batch-item .bn{flex:1;min-width:0;font:700 12px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.batch-item .bs{flex:0 0 auto;font:900 11px var(--sans);letter-spacing:.6px;padding:4px 8px;
+  border:2px solid var(--ink);text-transform:uppercase;background:#fff}
+.batch-item .bs.ok{background:var(--g)}
+.batch-item .bs.err{background:var(--r);color:#fff}
+
+/* ---------- 消息 ---------- */
+.msg{font:700 13px var(--sans);margin-top:10px;min-height:1px}
+.msg-ok{color:#0f7a45}
+.msg-err{color:var(--r)}
+.ssid-item{display:block;border:2px solid var(--ink);background:#fff;padding:8px 10px;margin-bottom:6px;
+  font:700 13px var(--sans);cursor:pointer}
+.ssid-item:hover{background:var(--y)}
+
+/* ---------- 导航：<641 底部页签 / 641~1399 顶栏 / >=1400 侧栏 ---------- */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fff;border-top:var(--bd) solid var(--ink);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+.nav .brand,.nav .foot{display:none}
+.tabs{display:flex;width:100%;max-width:var(--maxw);margin:0 auto}
+.tabs button{flex:1;min-width:0;border:0;background:transparent;cursor:pointer;padding:10px 2px 9px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;font:800 11px var(--sans);
+  letter-spacing:.6px;text-transform:uppercase;border-top:4px solid transparent}
+.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.tabs button[aria-selected="true"]{background:var(--y);border-top-color:var(--ink)}
+@media(min-width:641px){
+  body{padding-bottom:0}
+  .nav{position:sticky;top:0;bottom:auto;border-top:0;border-bottom:var(--bd) solid var(--ink);
+    display:flex;align-items:center;gap:16px;padding:0 18px;min-height:var(--navh)}
+  .nav .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .nav .brand b{font:900 17px var(--sans);letter-spacing:-.4px;text-transform:uppercase;white-space:nowrap}
+  .nav .brand small{display:block;font:700 10px var(--mono);color:var(--ink2)}
+  .tabs{width:auto;margin:0 0 0 auto;gap:8px;flex:0 1 auto}
+  .tabs button{flex:0 0 auto;flex-direction:row;gap:8px;padding:9px 14px;font-size:13px;border-top:0;
+    border:2px solid transparent}
+  .tabs button[aria-selected="true"]{border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink);background:var(--y)}
+}
+@media(min-width:1400px){
+  .nav{position:sticky;top:0;height:100vh;flex-direction:column;align-items:stretch;gap:0;
+    border-bottom:0;border-right:var(--bd) solid var(--ink);padding:22px 16px;width:250px}
+  .nav .brand{padding:0 4px 18px;border-bottom:var(--bd) solid var(--ink)}
+  .nav .brand b{font-size:19px}
+  .tabs{flex-direction:column;margin:18px 0 0;gap:12px}
+  .tabs button{flex:1 1 auto;justify-content:flex-start;padding:12px 13px;font-size:14px}
+  .nav .foot{display:block;margin-top:auto;padding:14px 4px 0;border-top:var(--bd) solid var(--ink);
+    font:700 11px/1.8 var(--mono);color:var(--ink2)}
+}
+.cols{display:grid;gap:26px;grid-template-columns:minmax(0,1fr)}
+.cols>*{min-width:0}
+@media(min-width:1024px){.cols.status{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}}
+@media(min-width:1400px){
+  .cols.c2{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}
+  .cols.c2b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 </style>
 </head>
 <body>
-<div class="dash">
-<div class="topbar">
-<h1>PhotoPainter</h1>
-<div style="display:flex;gap:6px">
-<span class="wifi-tag wifi-off" id="wifi-tag">WiFi: --</span>
-<span class="wifi-tag wifi-on" id="batt-tag">电量 --</span>
-</div>
-</div>
-<div class="card">
-<h2>传感器</h2>
-<div class="grid2">
-<div class="cell"><div class="lbl">温度</div><div class="val val-red" id="s-temp">--</div><div class="unit">℃</div></div>
-<div class="cell"><div class="lbl">湿度</div><div class="val val-blue" id="s-rh">--</div><div class="unit">%</div></div>
-</div>
-</div>
+<div class="tape" aria-hidden="true"></div>
+<div class="shell">
+<nav class="nav">
+  <div class="brand">
+    <span><b>PhotoPainter</b><small>ESP32-S3 &middot; SPECTRA 6 &middot; 800&times;480</small></span>
+  </div>
+  <div class="tabs">
+    <button aria-selected="true" data-p="p-status">
+      <svg viewBox="0 0 24 24"><path d="M3 13h4l2.5 6L13 5l2.5 8H21"/></svg>&#29366;&#24577;</button>
+    <button data-p="p-photos">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="m4 17 5-4 4 3 3-2 4 3"/></svg>&#22270;&#29255;</button>
+    <button data-p="p-play">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="M10 9.5v5l4.5-2.5z"/></svg>&#25773;&#25918;</button>
+    <button data-p="p-settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg>&#35774;&#32622;</button>
+  </div>
+  <div class="foot">PhotoPainter<br>ESP32-S3 &middot; 6 &#33394;&#22696;&#27700;&#23631;</div>
+</nav>
 
-<div class="card">
-<h2>相框状态</h2>
-<div class="grid2">
-<div class="cell"><div class="lbl">图片数量</div><div class="val val-blue" id="img-count">--</div></div>
-<div class="cell"><div class="lbl">当前索引</div><div class="val val-green" id="img-index">--</div></div>
-<div class="cell"><div class="lbl">轮播间隔</div><div class="val" id="img-interval">--</div><div class="unit">时:分</div></div>
-<div class="cell"><div class="lbl">运行状态</div><div class="val" id="img-running">--</div></div>
-<div class="cell"><div class="lbl">电池电压</div><div class="val val-green" id="batt-volt">--</div><div class="unit">V</div></div>
-<div class="cell"><div class="lbl">充电状态</div><div class="val" id="batt-chg">--</div></div>
-</div>
-</div>
-<div class="card">
-<h2>上传图片</h2>
-<div class="upload-zone" onclick="document.getElementById('file-input').click()">
-<p style="color:var(--muted);font-size:13px">点击选择图片（支持 JPG/PNG/BMP）</p>
-<p style="color:var(--muted);font-size:12px">可一次<b>多选</b>：批量上传只写入存储卡、<b>不刷屏</b>；完成后自动跳到图片列表的新增项（高亮），点缩略图即可上屏</p>
-<p style="color:var(--muted);font-size:12px">上传到：<b id="upload-target">（根目录）</b></p>
-<input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="window.fileChanged()">
-</div>
-<div class="compare" id="preview-area" style="display:none">
-<div><img id="preview-orig" alt="原图"><div class="label" id="label-orig">原图</div></div>
-<div><img id="preview-processed" alt="处理后"><div class="label" id="label-proc">处理后</div></div>
-</div>
-<div id="img-adjust" style="display:none">
-<div class="info-row"><span class="key">亮度</span><input type="range" id="adj-br" min="-50" max="50" value="0" oninput="window.onAdjust()"><span class="adjust-val" id="val-br">0</span></div>
-<div class="info-row"><span class="key">对比度</span><input type="range" id="adj-ct" min="-50" max="50" value="20" oninput="window.onAdjust()"><span class="adjust-val" id="val-ct">+20</span></div>
-<div class="info-row"><span class="key">饱和度</span><input type="range" id="adj-st" min="-50" max="50" value="20" oninput="window.onAdjust()"><span class="adjust-val" id="val-st">+20</span></div>
-<div class="info-row"><span class="key">锐化</span><input type="range" id="adj-sh" min="0" max="100" value="50" oninput="window.onAdjust()"><span class="adjust-val" id="val-sh">50</span></div>
-<div class="info-row"><span class="key">管线</span><select id="adj-pipe" onchange="window.onPipeChange()"><option value="epdoptimize">epdoptimize</option><option value="opendisplay">OpenDisplay</option></select></div>
-<div class="info-row"><span class="key">抖动模式</span><select id="adj-dither" onchange="window.onAdjust()"><option value="floydSteinberg">Floyd-Steinberg</option><option value="atkinson">Atkinson</option><option value="jarvis">Jarvis-Judice-Ninke</option><option value="stucki">Stucki</option><option value="burkes">Burkes</option><option value="sierra3">Sierra-3</option><option value="sierra2">Sierra-2</option></select></div>
-<div class="info-row"><span class="key">缩放模式</span><select id="adj-scale" onchange="window.onScaleChange()"><option value="auto">自动</option><option value="fit">等比留白</option><option value="stretch">强制拉伸</option></select></div>
-<div class="info-row" id="row-dir"><span class="key">方向</span><select id="adj-dir" onchange="window.onScaleChange()"><option value="auto">自动</option><option value="landscape">横屏 800×480</option><option value="portrait">竖屏 480×800</option></select></div>
-<div class="info-row"><span class="key">扩散强度</span><input type="range" id="adj-df" min="0" max="200" value="100" oninput="window.onAdjust()"><span class="adjust-val" id="val-df">100</span></div>
-</div>
-<div class="btn-row" id="action-row" style="display:none">
-<button class="btn btn-purple" onclick="window.rotateImg()" style="flex:1">旋转 0°</button>
-<button class="btn btn-green" onclick="window.uploadPhoto()" style="flex:2">显示到屏幕</button>
-</div>
-<div id="upload-progress"><div></div></div>
-<p class="msg" id="upload-msg"></p>
-<div id="batch-card">
-<div id="batch-progress"><div></div></div>
-<div class="batch-list" id="batch-list"></div>
-</div>
-</div>
-<div class="card">
-<h2>图片列表 (<span id="photo-count">0</span>)</h2>
-<div class="photo-grid" id="photo-list"><p style="color:var(--muted);font-size:12px">加载中...</p></div>
-<p class="msg" id="list-msg"></p>
-</div>
+<main>
+  <!-- ===================== 状态 ===================== -->
+  <section id="p-status">
+    <div class="hd">
+      <h1>&#29366;<br>&#24577;</h1>
+      <div class="rt">
+        <span class="wifi-tag wifi-off" id="wifi-tag">WiFi: --</span>
+        <span class="wifi-tag wifi-on" id="batt-tag">&#30005;&#37327; --</span>
+      </div>
+    </div>
 
-<div class="card">
-<h2>设置</h2>
+    <h2 class="sec y">&#20256;&#24863;&#22120;</h2>
+    <div class="tiles">
+      <div class="tile"><div class="l">&#28201;&#24230;</div><div class="v"><span id="s-temp">--</span><span>&#8451;</span></div></div>
+      <div class="tile"><div class="l">&#28287;&#24230;</div><div class="v"><span id="s-rh">--</span><span>%</span></div></div>
+    </div>
 
-<details id="wifi-details" style="margin-bottom:8px">
-<summary>WiFi 配网</summary>
-<p style="margin:6px 0;font-size:13px">AP: <b>PhotoFrame</b> / 密码: <b>12345678</b></p>
-<button class="btn btn-blue" onclick="window.scanWifi()" style="margin-bottom:8px">扫描网络</button>
-<div id="ssid-list"></div>
-<input id="wifi-ssid" placeholder="SSID">
-<input id="wifi-pass" type="password" placeholder="密码">
-<button class="btn btn-blue" onclick="window.connectWifi()">连接</button>
-<p class="msg" id="wifi-msg"></p>
-<button class="btn btn-red" onclick="window.resetWifi()" style="margin-top:6px">重置 WiFi</button>
-</details>
+    <h2 class="sec">&#30456;&#26694;&#29366;&#24577;</h2>
+    <div class="tiles">
+      <div class="tile hi"><div class="l">&#22270;&#29255;&#25968;&#37327;</div><div class="v"><span id="img-count">--</span><span>&#24352;</span></div></div>
+      <div class="tile"><div class="l">&#24403;&#21069;&#32034;&#24341;</div><div class="v"><span id="img-index">--</span></div></div>
+      <div class="tile"><div class="l">&#36718;&#25773;&#38388;&#38548;</div><div class="v" style="font-size:20px"><span id="img-interval">--</span></div></div>
+      <div class="tile hi2"><div class="l" style="color:#04321f">&#36816;&#34892;&#29366;&#24577;</div><div class="v" style="font-size:20px"><span id="img-running">--</span></div></div>
+      <div class="tile"><div class="l">&#30005;&#27744;&#30005;&#21387;</div><div class="v"><span id="batt-volt">--</span><span>V</span></div></div>
+      <div class="tile"><div class="l">&#20805;&#30005;&#29366;&#24577;</div><div class="v" style="font-size:20px"><span id="batt-chg">--</span></div></div>
+    </div>
 
-<details style="margin-bottom:8px" open>
-<summary>相框设置</summary>
-<div class="info-row"><span class="key">轮播间隔</span><input id="set-interval-h" type="number" min="0" max="24" style="width:62px;margin:0" oninput="window.updateIntervalHint()"><span style="color:var(--muted);font-size:13px;margin:0 5px">时</span><input id="set-interval-m" type="number" min="0" max="59" style="width:62px;margin:0" oninput="window.updateIntervalHint()"><span style="color:var(--muted);font-size:13px;margin-left:5px">分</span><span id="interval-hint" style="font-size:12px;color:var(--muted);margin-left:8px"></span></div>
-<div class="toggle-row"><span class="key">自动轮播</span><span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span></div>
-<div class="info-row"><span class="key">播放目录</span><select id="set-dir" onchange="window.onDirChange()" style="width:170px;margin:0"></select></div>
-<div class="info-row"><span class="key">轮播方式</span><select id="set-mode" onchange="window.onModeChange()" style="width:170px;margin:0">
-<option value="0">顺序</option><option value="1">倒序</option><option value="2">随机</option>
-</select></div>
-<div class="info-row"><span class="key">新建分类目录</span><input id="new-dir" placeholder="如 猫咪" style="width:110px;margin:0"><button class="btn btn-blue" onclick="window.createDir()" style="padding:5px 10px;font-size:12px;margin-left:6px">创建</button></div>
-<div class="info-row"><span class="key">停止轮播开始</span><input id="set-sleep-start" type="time" value="23:00" style="width:120px;margin:0"></div>
-<div class="info-row"><span class="key">停止轮播结束</span><input id="set-sleep-end" type="time" value="07:00" style="width:120px;margin:0"></div>
-<button class="btn btn-green" onclick="window.saveSettings()" style="margin-top:6px">保存设置</button>
-<p class="msg" id="set-msg"></p>
-</details>
+    <div class="btnrow" style="margin-top:26px">
+      <button class="btn" onclick="window.updateStatus()">&#21047;&#26032;&#29366;&#24577;</button>
+      <button class="btn" onclick="window.showTab('p-photos')">&#21435;&#19978;&#20256;</button>
+      <button class="btn" onclick="window.showTab('p-play')">&#25773;&#25918;&#35774;&#32622;</button>
+    </div>
+  </section>
 
-<details id="mqtt-details" style="margin-bottom:8px">
-<summary>MQTT (Home Assistant)</summary>
-<div class="toggle-row"><span class="key">启用 MQTT</span><span class="toggle-sw" id="set-mqtt-enabled" onclick="window.toggleMqttEnabled()"></span></div>
-<div class="info-row"><span class="key">Broker 地址</span><input id="set-mqtt-host" placeholder="192.168.1.100" style="width:140px;margin:0"></div>
-<div class="info-row"><span class="key">端口</span><input id="set-mqtt-port" type="number" min="1" max="65535" value="1883" style="width:80px;margin:0"></div>
-<div class="info-row"><span class="key">用户名</span><input id="set-mqtt-user" placeholder="(可选)" style="width:120px;margin:0"></div>
-<div class="info-row"><span class="key">密码</span><input id="set-mqtt-pass" type="password" placeholder="(可选)" style="width:120px;margin:0"></div>
-<button class="btn btn-green" onclick="window.saveMqttSettings()" style="margin-top:6px">保存 MQTT 设置</button>
-<p class="msg" id="mqtt-msg"></p>
-</details>
+  <!-- ===================== 图片（含上传） ===================== -->
+  <section id="p-photos" class="hidden">
+    <div class="hd">
+      <h1>&#22270;<br>&#29255;</h1>
+      <div class="rt">&#20849; <span id="photo-count">0</span> &#24352;</div>
+    </div>
 
-<button class="btn btn-red" onclick="window.rebootDevice()">重启设备</button>
+    <details class="upl" open>
+      <summary>&#19978;&#20256;&#26032;&#29031;&#29255;</summary>
+      <div class="uplbody">
+        <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+          <div class="t">&#28857;&#36825;&#37324;&#36873;&#29031;&#29255;</div>
+          <div class="s">JPG / PNG / BMP &middot; &#21487;&#19968;&#27425;&#22810;&#36873;&#12290;&#25209;&#37327;&#19978;&#20256;&#21482;&#20889;&#20837;&#23384;&#20648;&#21345;&#12289;&#19981;&#21047;&#23631;&#65307;&#23436;&#25104;&#21518;&#33258;&#21160;&#36339;&#21040;&#26032;&#22686;&#39033;&#24182;&#39640;&#20142;</div>
+          <div class="s">&#19978;&#20256;&#21040;&#65306;<b id="upload-target">&#65288;&#26681;&#30446;&#24405;&#65289;</b></div>
+        </div>
+        <input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="window.fileChanged()">
 
+        <div class="cmp" id="preview-area" style="display:none">
+          <figure><img id="preview-orig" alt="&#21407;&#22270;"><figcaption id="label-orig">&#21407;&#22270;</figcaption></figure>
+          <figure><img id="preview-processed" alt="&#22788;&#29702;&#21518;"><figcaption id="label-proc">&#22788;&#29702;&#21518;</figcaption></figure>
+        </div>
 
+        <div id="img-adjust" style="display:none;margin-top:18px">
+          <div class="info-row"><span class="key">&#20142;&#24230;</span><input type="range" id="adj-br" min="-50" max="50" value="0" oninput="window.onAdjust()"><span class="adjust-val" id="val-br">0</span></div>
+          <div class="info-row"><span class="key">&#23545;&#27604;&#24230;</span><input type="range" id="adj-ct" min="-50" max="50" value="20" oninput="window.onAdjust()"><span class="adjust-val" id="val-ct">+20</span></div>
+          <div class="info-row"><span class="key">&#39281;&#21644;&#24230;</span><input type="range" id="adj-st" min="-50" max="50" value="20" oninput="window.onAdjust()"><span class="adjust-val" id="val-st">+20</span></div>
+          <div class="info-row"><span class="key">&#38160;&#21270;</span><input type="range" id="adj-sh" min="0" max="100" value="50" oninput="window.onAdjust()"><span class="adjust-val" id="val-sh">50</span></div>
+          <div class="info-row"><span class="key">&#25193;&#25955;&#24378;&#24230;</span><input type="range" id="adj-df" min="0" max="200" value="100" oninput="window.onAdjust()"><span class="adjust-val" id="val-df">100</span></div>
+          <div class="info-row"><span class="key">&#31649;&#32447;</span><select id="adj-pipe" onchange="window.onPipeChange()"><option value="epdoptimize">epdoptimize</option><option value="opendisplay">OpenDisplay</option></select></div>
+          <div class="info-row"><span class="key">&#25238;&#21160;&#27169;&#24335;</span><select id="adj-dither" onchange="window.onAdjust()"><option value="floydSteinberg">Floyd-Steinberg</option><option value="atkinson">Atkinson</option><option value="jarvis">Jarvis-Judice-Ninke</option><option value="stucki">Stucki</option><option value="burkes">Burkes</option><option value="sierra3">Sierra-3</option><option value="sierra2">Sierra-2</option></select></div>
+          <div class="info-row"><span class="key">&#32553;&#25918;&#27169;&#24335;</span><select id="adj-scale" onchange="window.onScaleChange()"><option value="auto">&#33258;&#21160;</option><option value="fit">&#31561;&#27604;&#30041;&#30333;</option><option value="stretch">&#24378;&#21046;&#25289;&#20280;</option></select></div>
+          <div class="info-row" id="row-dir"><span class="key">&#26041;&#21521;</span><select id="adj-dir" onchange="window.onScaleChange()"><option value="auto">&#33258;&#21160;</option><option value="landscape">&#27178;&#23631; 800&times;480</option><option value="portrait">&#31446;&#23631; 480&times;800</option></select></div>
+        </div>
 
+        <div class="btnrow" id="action-row" style="display:none;margin-top:18px">
+          <button class="btn" onclick="window.rotateImg()">&#26059;&#36716; 90&deg;</button>
+          <button class="btn g" style="flex:2 1 200px" onclick="window.uploadPhoto()">&#26174;&#31034;&#21040;&#23631;&#24149;</button>
+        </div>
+
+        <div class="prog" id="upload-progress"><div></div></div>
+        <p class="msg" id="upload-msg"></p>
+
+        <div id="batch-card">
+          <div class="prog" id="batch-progress"><div></div></div>
+          <div class="blist" id="batch-list"></div>
+        </div>
+      </div>
+    </details>
+
+    <h2 class="sec">&#29031;&#29255;</h2>
+    <div id="photo-list"><p style="color:var(--ink2);font-size:13px">&#21152;&#36733;&#20013;...</p></div>
+    <p class="msg" id="list-msg"></p>
+  </section>
+
+  <!-- ===================== 播放 ===================== -->
+  <section id="p-play" class="hidden">
+    <div class="hd">
+      <h1>&#25773;<br>&#25918;</h1>
+      <div class="rt">&#36718;&#25773;&#33410;&#22863;&#19982;&#33539;&#22260;</div>
+    </div>
+
+    <div class="cols c2b">
+      <div>
+        <h2 class="sec y">&#36718;&#25773;</h2>
+        <div class="blk pad">
+          <span class="k" style="display:block;font:800 11px var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2);margin-bottom:7px">&#36718;&#25773;&#38388;&#38548;</span>
+          <div class="time">
+            <span class="step"><button type="button" onclick="window.stepInterval(-1,0)">&minus;</button><input id="set-interval-h" type="number" min="0" max="24" value="1" oninput="window.updateIntervalHint()"><button type="button" onclick="window.stepInterval(1,0)">+</button></span><span class="u">&#26102;</span>
+            <span class="step"><button type="button" onclick="window.stepInterval(-1,1)">&minus;</button><input id="set-interval-m" type="number" min="0" max="59" value="30" oninput="window.updateIntervalHint()"><button type="button" onclick="window.stepInterval(1,1)">+</button></span><span class="u">&#20998;</span>
+          </div>
+          <div style="margin-top:12px"><span class="hint" id="interval-hint"></span></div>
+
+          <div class="toggle-row" style="margin-top:22px;padding-top:18px;border-top:var(--bd) solid var(--ink)">
+            <span class="key">&#33258;&#21160;&#36718;&#25773;</span>
+            <span class="toggle-sw on" id="set-running" onclick="window.toggleRunning()"></span>
+          </div>
+
+          <div style="padding-top:18px;border-top:var(--bd) solid var(--ink)">
+            <span class="k" style="display:block;font:800 11px var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2);margin-bottom:9px">&#36718;&#25773;&#26041;&#24335;</span>
+            <select id="set-mode" onchange="window.onModeChange()">
+              <option value="0">&#39034;&#24207;</option><option value="1">&#20498;&#24207;</option><option value="2">&#38543;&#26426;</option>
+            </select>
+            <p style="font:700 12px var(--sans);color:var(--ink2);margin-top:11px">&#38543;&#26426;&#65281;&#27927;&#29260;&#19981;&#37325;&#22797;&#65292;&#19968;&#36718;&#36208;&#23436;&#33258;&#21160;&#37325;&#27927;</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="sec">&#30446;&#24405;&#19982;&#20241;&#30496;</h2>
+        <div class="blk pad">
+          <div class="info-row"><span class="key">&#25773;&#25918;&#30446;&#24405;</span><select id="set-dir" onchange="window.onDirChange()"></select></div>
+          <div class="info-row"><span class="key">&#26032;&#24314;&#30446;&#24405;</span><input id="new-dir" placeholder="&#22914; &#29483;&#21602;"><button class="btn sm" type="button" onclick="window.createDir()">&#21019;&#24314;</button></div>
+          <div class="info-row"><span class="key">&#20572;&#27490;&#36718;&#25773;</span><input id="set-sleep-start" type="time" value="23:00"></div>
+          <div class="info-row"><span class="key">&#24674;&#22797;&#36718;&#25773;</span><input id="set-sleep-end" type="time" value="07:00"></div>
+          <div class="btnrow" style="margin-top:20px"><button class="btn g wide" onclick="window.saveSettings()">&#20445;&#23384;&#25773;&#25918;&#35774;&#32622;</button></div>
+          <p class="msg" id="set-msg"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 设置 ===================== -->
+  <section id="p-settings" class="hidden">
+    <div class="hd">
+      <h1>&#35774;<br>&#32622;</h1>
+      <div class="rt">&#32593;&#32476; &middot; Home Assistant</div>
+    </div>
+
+    <div class="cols c2b">
+      <div>
+        <h2 class="sec y">&#32593;&#32476;</h2>
+        <div class="blk pad">
+          <details id="wifi-details">
+            <summary style="font:900 15px var(--sans);cursor:pointer">WiFi &#37197;&#32593;</summary>
+            <p style="margin:10px 0;font:700 13px var(--sans);color:var(--ink2)">AP: <b>PhotoFrame</b> / &#23494;&#30721;: <b>12345678</b></p>
+            <div class="btnrow" style="margin-bottom:12px">
+              <button class="btn sm" type="button" onclick="window.scanWifi()">&#25195;&#25551;&#32593;&#32476;</button>
+              <button class="btn sm r" type="button" onclick="window.resetWifi()">&#37325;&#32622; WiFi</button>
+            </div>
+            <div id="ssid-list"></div>
+            <div class="info-row"><span class="key">SSID</span><input id="wifi-ssid" placeholder="SSID"></div>
+            <div class="info-row"><span class="key">&#23494;&#30721;</span><input id="wifi-pass" type="password" placeholder="&#23494;&#30721;"></div>
+            <button class="btn b wide" type="button" onclick="window.connectWifi()">&#36830;&#25509;</button>
+            <p class="msg" id="wifi-msg"></p>
+          </details>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="sec">Home Assistant</h2>
+        <div class="blk pad">
+          <details id="mqtt-details">
+            <summary style="font:900 15px var(--sans);cursor:pointer">MQTT</summary>
+            <div class="toggle-row" style="margin-top:14px">
+              <span class="key">&#21551;&#29992; MQTT</span>
+              <span class="toggle-sw" id="set-mqtt-enabled" onclick="window.toggleMqttEnabled()"></span>
+            </div>
+            <div class="info-row"><span class="key">Broker</span><input id="set-mqtt-host" placeholder="192.168.1.100"></div>
+            <div class="info-row"><span class="key">&#31471;&#21475;</span><input id="set-mqtt-port" type="number" min="1" max="65535" value="1883"></div>
+            <div class="info-row"><span class="key">&#29992;&#25143;&#21517;</span><input id="set-mqtt-user" placeholder="(&#21487;&#36873;)"></div>
+            <div class="info-row"><span class="key">&#23494;&#30721;</span><input id="set-mqtt-pass" type="password" placeholder="(&#21487;&#36873;)"></div>
+            <button class="btn g wide" type="button" onclick="window.saveMqttSettings()">&#20445;&#23384; MQTT</button>
+            <p class="msg" id="mqtt-msg"></p>
+          </details>
+        </div>
+
+        <h2 class="sec r">&#21361;&#38505;&#25805;&#20316;</h2>
+        <div class="blk pad">
+          <p style="font:700 13px var(--sans);color:var(--ink2);margin-bottom:16px">&#37325;&#21551;&#20250;&#20013;&#26029;&#27491;&#22312;&#36827;&#34892;&#30340;&#19978;&#20256;&#19982;&#22696;&#27700;&#23631;&#21047;&#26032;&#12290;</p>
+          <button class="btn r wide" type="button" onclick="window.rebootDevice()">&#37325;&#21551;&#35774;&#22791;</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
 </div>
 <script type="module">
+/* ---- 页签切换（本次移植新增：原来是单页长滚动，现改为 4 个页签） ---- */
+function showTab(id){
+  document.querySelectorAll('.tabs button').forEach(function(b){
+    b.setAttribute('aria-selected', String(b.dataset.p===id))});
+  document.querySelectorAll('main > section').forEach(function(s){
+    s.classList.toggle('hidden', s.id!==id)});
+  window.scrollTo({top:0,behavior:'instant'})}
+window.showTab=showTab;
+var _h=location.hash.slice(1);
+if(_h&&document.getElementById(_h)&&document.getElementById(_h).parentElement.tagName==='MAIN')showTab(_h);
+document.querySelectorAll('.tabs button').forEach(function(b){
+  b.onclick=function(){showTab(b.dataset.p)}});
+
+/* ---- 时/分步进器的 ± 按钮（新增；只动界面，间隔本身仍以分钟提交） ---- */
+function stepInterval(delta,which){
+  var h=document.getElementById('set-interval-h'), m=document.getElementById('set-interval-m');
+  var hv=parseInt(h.value,10), mv=parseInt(m.value,10);
+  if(!isFinite(hv)||hv<0)hv=0; if(!isFinite(mv)||mv<0)mv=0;
+  var total=hv*60+mv+delta*(which?1:60);
+  if(total<1)total=1; if(total>1440)total=1440;
+  h.value=Math.floor(total/60); m.value=total%60;
+  window.updateIntervalHint()}
+window.stepInterval=stepInterval;
+
 import { ditherImage, replaceColors, aitjcizeSpectra6Palette }
 from '/lib/epdoptimize.js';
 let odModule=null;
@@ -716,4 +968,5 @@ setInterval(updateStatus,5000);loadSettings();loadDirs();loadAdjusted();onScaleC
 </script>
 </body>
 </html>
+
 )END===="";
