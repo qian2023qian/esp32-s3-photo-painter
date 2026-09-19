@@ -125,6 +125,13 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),li
 .step button:last-child{border-left:2px solid var(--ink)}
 .time .u{font:800 12px var(--sans);letter-spacing:1px;text-transform:uppercase;padding-bottom:18px}
 .hint{display:inline-block;font:800 12px var(--mono);background:var(--b);color:#fff;padding:5px 9px}
+/* 内容变宽后，小控件不该跟着拉长（否则步进器/按钮会变成超宽空盒子）——统一加上限 */
+@media(min-width:641px){
+  .time{grid-template-columns:minmax(0,200px) auto minmax(0,200px) auto;justify-content:start}
+  .seg{max-width:580px}
+  .btn.wide{max-width:420px}
+  label.f>input,label.f>select{max-width:580px}
+}
 
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;min-width:0;height:34px;background:transparent}
 input[type=range]::-webkit-slider-runnable-track{height:10px;background:#fff;border:2px solid var(--ink)}
@@ -203,7 +210,7 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px 18px 60px;min-width:0}
 @media(min-width:641px){main{padding:26px 26px 70px}}
 /* 侧栏贴左边（全出血），只有内容在右侧剩余区域里居中、并保持原来的宽度：
    内容是定宽居中的，不随窗口拉伸——否则 .btn.wide 之类的元素会被拉得极宽 */
-@media(min-width:1024px){.shell{display:grid;grid-template-columns:250px minmax(0,1fr)}
+@media(min-width:1400px){.shell{display:grid;grid-template-columns:250px minmax(0,1fr)}
   main{padding:34px 46px 80px;max-width:1160px;margin:0 auto}}
 .cols{display:grid;gap:26px;grid-template-columns:minmax(0,1fr)}
 .cols>*{min-width:0}
@@ -238,7 +245,9 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px 18px 60px;min-width:0}
     border:2px solid transparent}
   .tabs button[aria-selected="true"]{border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
 }
-@media(min-width:1024px){
+/* 侧栏只在 ≥1400 出现：2560×1600 屏在 200% 缩放下 CSS 视口仅约 1318px，
+   这种宽度再分 250px 给侧栏，内容就只剩 ~976px —— 此时用顶部导航更划算 */
+@media(min-width:1400px){
   .nav{position:sticky;top:0;height:100vh;flex-direction:column;align-items:stretch;gap:0;
     border-bottom:0;border-right:var(--bd) solid var(--ink);padding:22px 16px;width:250px}
   .nav .brand{padding:0 4px 18px;border-bottom:var(--bd) solid var(--ink)}
@@ -292,8 +301,8 @@ body:has(#cw1120:checked) main{max-width:1120px}
 body:has(#cw1400:checked) main{max-width:1400px}
 body:has(#cw1600:checked) main{max-width:1600px}
 body:has(#cw0:checked) main{max-width:none}
-/* 隐藏侧栏：把侧栏那 250px 让给内容 —— 窗口不够宽时这是唯一能真正加宽内容的办法 */
-@media(min-width:1024px){
+/* 隐藏侧栏：把侧栏那 250px 让给内容（≥1400 才有侧栏，所以断点一致） */
+@media(min-width:1400px){
   body:has(#cwnonav:checked) .nav{display:none}
   body:has(#cwnonav:checked) .shell{grid-template-columns:minmax(0,1fr)}
 }
@@ -602,7 +611,7 @@ $$('.btn').forEach(b=>{if(!b.closest('#sheet')&&!b.closest('.seg'))b.onclick=()=
   const show=()=>{
     if(!now) return;
     const act=Math.round(main.getBoundingClientRect().width);
-    now.textContent = (want>0 && act < want-4) ? act+'px（受窗口限制）' : act+'px';
+    now.textContent = (want>0 && act < want-4) ? act+'px（视口仅 '+innerWidth+'px）' : act+'px';
   };
   const apply=w=>{
     want=w;
