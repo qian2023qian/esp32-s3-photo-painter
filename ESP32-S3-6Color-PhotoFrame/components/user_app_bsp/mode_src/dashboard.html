@@ -226,6 +226,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 @media(min-width:1400px){
   .cols.c2{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}
   .cols.c2b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+/* 状态页「正在显示」 */
+.nowwrap{border:var(--bd) solid var(--ink);background:#fff;padding:10px}
+.nowwrap img{width:100%;aspect-ratio:5/3;object-fit:contain;background:#f2efe6;
+  border:2px solid var(--ink);display:block}
+.nowmeta{display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+  margin-top:10px;font:800 12px var(--mono);flex-wrap:wrap}
+.nowmeta b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nowmeta span{color:var(--ink2);flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -259,6 +267,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       </div>
     </div>
 
+    <div class="cols status">
+    <div>
+    <h2 class="sec y">&#27491;&#22312;&#26174;&#31034;</h2>
+    <div class="blk pad">
+      <div class="nowwrap"><img id="now-photo" alt="&#24403;&#21069;&#26174;&#31034;"></div>
+      <div class="nowmeta"><b id="now-name">--</b><span id="now-pos">--</span></div>
+    </div>
+    </div>
+    <div>
     <h2 class="sec y">&#20256;&#24863;&#22120;</h2>
     <div class="tiles">
       <div class="tile"><div class="l">&#28201;&#24230;</div><div class="v"><span id="s-temp">--</span><span>&#8451;</span></div></div>
@@ -279,6 +296,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       <button class="btn" onclick="window.updateStatus()">&#21047;&#26032;&#29366;&#24577;</button>
       <button class="btn" onclick="window.showTab('p-photos')">&#21435;&#19978;&#20256;</button>
       <button class="btn" onclick="window.showTab('p-play')">&#25773;&#25918;&#35774;&#32622;</button>
+    </div>
+    </div>
     </div>
   </section>
 
@@ -331,6 +350,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       </div>
     </details>
 
+    <div class="info-row" style="margin:20px 0 6px">
+      <span class="key">&#25773;&#25918;&#30446;&#24405;</span>
+      <select id="photo-dir" onchange="window.onPhotoDirChange()"></select>
+      <button class="btn sm" type="button" onclick="window.refreshPhotos()">&#21047;&#26032;&#21015;&#34920;</button>
+    </div>
     <h2 class="sec">&#29031;&#29255;</h2>
     <div id="photo-list"><p style="color:var(--ink2);font-size:13px">&#21152;&#36733;&#20013;...</p></div>
     <p class="msg" id="list-msg"></p>
@@ -487,7 +511,7 @@ let bt=$('batt-tag');bt.textContent='电量 '+(d.battery_percent<0?'--':d.batter
 bt.className='wifi-tag '+(d.low_battery?'batt-low':'wifi-on');
 $('batt-volt').textContent=d.battery_voltage.toFixed(2);
 $('batt-chg').textContent=d.charging?'充电中':(chgMap[d.charge_status]||'--');
-$('img-count').textContent=d.img_count;$('img-index').textContent=d.img_index;
+$('img-count').textContent=d.img_count;$('img-index').textContent=d.img_index;updateNowPhoto();
 $('img-interval').textContent=minutesToHM(d.interval);$('img-running').textContent=d.running?'运行中':'已暂停';
 $('s-temp').textContent=d.temperature.toFixed(1);$('s-rh').textContent=d.humidity.toFixed(1);
 if(d.wifi){$('wifi-details').open=false}
@@ -505,11 +529,11 @@ var calMap={"#000000":"#1f2226","#FFFFFF":"#b9c7c9","#FFFF00":"#c1bb1e","#FF0000
 function toCal(r,g,b){var h="#"+[r,g,b].map(function(v){return v.toString(16).padStart(2,"0")}).join("");return calMap[h.toUpperCase()]}
 var pageStore={};
 var hlNames=new Set();   // 刚批量上传的文件名，用于在列表里高亮
-var thumbPageSize=10;
+var thumbPageSize=12;   // 每页 12 张（用户要求）
 function refreshPhotos(){
 	api('GET','/api/photos').then(function(d){
 	$('photo-count').textContent=d.total;var oldPg=thumbPage;thumbFiles=d.files||[];thumbPage=Math.min(oldPg,Math.max(0,Math.ceil(thumbFiles.length/thumbPageSize)-1));
-	renderPage()})}
+	updateNowPhoto();renderPage()})}
 function renderPage(fromCache){
 	thumbQueue=[];preloadPaused=1;preloadQueue=[];var total=Math.ceil(thumbFiles.length/thumbPageSize)||1;
 	var key=thumbPage+'_'+thumbFiles.length;
@@ -625,18 +649,27 @@ setMsg('set-msg','保存中...',1);
 api('POST','/api/settings',{running:on}).then(function(){setMsg('set-msg',on?'已开启自动轮播（已保存）':'已暂停自动轮播（已保存）',1);updateStatus()})
 .catch(function(){t.classList.toggle('on');setMsg('set-msg','保存失败',0)})}
 /* ---- 分类目录 / 轮播方式 ---- */
+/* 目录下拉有两个（播放页 set-dir、图片页 photo-dir），填充与同步都要覆盖到 */
+function syncDirSelects(v){
+['set-dir','photo-dir'].forEach(function(id){let s=$(id);if(!s)return;
+for(let i=0;i<s.options.length;i++){if(s.options[i].value===v){s.selectedIndex=i;break}}})}
 function loadDirs(){api('GET','/api/dirs').then(function(d){
-let sel=$('set-dir');if(!sel)return;let cur=d.current||'';sel.innerHTML='';
-(d.dirs||['']).forEach(function(n){let o=document.createElement('option');o.value=n;o.textContent=n?n:'（根目录）';sel.appendChild(o)});
-for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===cur){sel.selectedIndex=i;break}}
+let cur=d.current||'';
+['set-dir','photo-dir'].forEach(function(id){let sel=$(id);if(!sel)return;
+let h='';(d.dirs||['']).forEach(function(n){h+='<option value="'+n.replace(/"/g,'&quot;')+'">'+(n?n:'（根目录）')+'</option>'});
+sel.innerHTML=h;
+for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===cur){sel.selectedIndex=i;break}}});
 updateUploadTarget()}).catch(function(){})}
-function onDirChange(){let v=$('set-dir').value;setMsg('set-msg','切换中...',1);
+function applyDir(v){setMsg('set-msg','切换中...',1);
 api('POST','/api/settings',{dir:v}).then(function(){
 setMsg('set-msg','已切换到 '+(v||'根目录'),1);
-updateUploadTarget();
+syncDirSelects(v);updateUploadTarget();
 // 目录变了：清掉分页缓存、高亮与缩略图队列，重新拉列表
-hlNames=new Set();thumbPage=0;pageStore={};stopThumbs();thumbPaused=0;refreshPhotos();updateStatus()})
+hlNames=new Set();thumbPage=0;pageStore={};stopThumbs();thumbPaused=0;_nowName='';refreshPhotos();updateStatus()})
 .catch(function(){setMsg('set-msg','切换目录失败',0)})}
+function onDirChange(){applyDir($('set-dir').value)}
+function onPhotoDirChange(){applyDir($('photo-dir').value)}
+window.onPhotoDirChange=onPhotoDirChange;
 function onModeChange(){let sel=$('set-mode');let v=parseInt(sel.value,10);
 api('POST','/api/settings',{mode:v}).then(function(){setMsg('set-msg','轮播方式：'+sel.options[sel.selectedIndex].text,1)})
 .catch(function(){setMsg('set-msg','保存失败',0)})}
@@ -774,13 +807,30 @@ if(fileFlag&&lastOrigImg){reprocess()}}
 async function reprocess(){
 if(!sourceCanvas){sourceCanvas=document.createElement('canvas')}
 applyScale(lastOrigImg,sourceCanvas);$('label-orig').textContent='原图 ('+lastOrigImg.naturalWidth+'×'+lastOrigImg.naturalHeight+')';
-var _m=$('adj-scale').value,_dir=(currentImgW>currentImgH)?'横屏':'竖屏',_mode=(_m==='fit')?'等比留白':'拉伸';
-var _r=lastOrigImg.naturalWidth/lastOrigImg.naturalHeight,_tr=currentImgW/currentImgH;
-$('label-proc').textContent='目标 '+currentImgW+'×'+currentImgH+' | 偏差 '+(Math.abs(_r-_tr)/_tr*100).toFixed(1)+'% | '+_mode+' | '+_dir;
+/* 旧代码只判断 fit，选「自动」时会误报成「拉伸」；改为按 applyScale 的真实结果描述 */
+var _dir=(currentImgW>currentImgH)?'横屏':'竖屏';
+var _si=scaleInfo||{fit:false,auto:false,pct:1};
+$('label-proc').textContent='目标 '+currentImgW+'×'+currentImgH+' · '+(_si.fit?'等比留白':'拉伸')
++(_si.auto?'（自动判定）':'')+(_si.fit?(' · 缩放 '+Math.round(_si.pct*100)+'%'):' · 铺满')+' · '+_dir;
 await runPipeline(sourceCanvas, currentImgW, currentImgH);
 		$('upload-msg').textContent='已就绪';fileFlag=1}
 /* ================= 上传：单张流程 / 批量流程 ================= */
 function dirLabel(d){return d?d:'（根目录）'}
+
+/* 状态页「正在显示」：按当前索引取该图缩略图。只在文件名变化时才请求，
+   避免定时刷新反复打 ESP32 的单线程 HTTP。 */
+var _nowName='';
+function updateNowPhoto(){
+var el=$('now-photo');if(!el)return;
+var i=parseInt($('img-index').textContent,10),n=thumbFiles.length;
+if(!isFinite(i)||!n)return;
+if(i<0)i=0;if(i>=n)i=n-1;
+var pos=$('now-pos');if(pos)pos.textContent=(i+1)+' / '+n;
+var f=thumbFiles[i];if(!f||f===_nowName)return;
+_nowName=f;
+var nm=$('now-name');if(nm)nm.textContent=f;
+el.src='/api/photo?name='+encodeURIComponent(f)+'&thumb=1'}
+window.updateNowPhoto=updateNowPhoto;
 function updateUploadTarget(){let t=$('upload-target');let s=$('set-dir');if(t)t.textContent=dirLabel(s?s.value:'')}
 
 /* 上传文件名：管线_抖动_br_ct_st_sh_df_时间戳[_批内序号]。
@@ -876,6 +926,7 @@ let img=new Image();img.onload=async function(){
 lastOrigImg=img;$('preview-orig').src=img.src;
 await reprocess()};
 img.src=URL.createObjectURL(f)}
+var scaleInfo={fit:false,auto:false,pct:1};   // 由 applyScale 写入，供 reprocess 显示真实模式
 function applyScale(img,canvas){
 var m=$('adj-scale').value,d=$('adj-dir').value;
 var tw=800,th=480;
@@ -886,9 +937,11 @@ var ctx=canvas.getContext('2d');
 ctx.fillStyle=PAPER_WHITE;ctx.fillRect(0,0,tw,th);
 // 偏差 = |原图宽高比 - 目标宽高比| / 目标宽高比; auto 下偏差>=阈值时等比留白, 避免过度变形
 var dev=Math.abs(img.naturalWidth/img.naturalHeight - tw/th)/(tw/th);
-if(m==='fit'||(m==='auto'&&dev>=SCALE_THRESHOLD)){
-var s=Math.min(tw/img.naturalWidth,th/img.naturalHeight);var w=img.naturalWidth*s,h=img.naturalHeight*s;ctx.drawImage(img,(tw-w)/2,(th-h)/2,w,h)}
-else{ctx.drawImage(img,0,0,tw,th)}
+var fit=(m==='fit'||(m==='auto'&&dev>=SCALE_THRESHOLD));
+if(fit){
+var s=Math.min(tw/img.naturalWidth,th/img.naturalHeight);var w=img.naturalWidth*s,h=img.naturalHeight*s;ctx.drawImage(img,(tw-w)/2,(th-h)/2,w,h);
+scaleInfo={fit:true,auto:(m==='auto'),pct:s}}
+else{ctx.drawImage(img,0,0,tw,th);scaleInfo={fit:false,auto:(m==='auto'),pct:1}}
 }
 
 let adjustTimer=null;
