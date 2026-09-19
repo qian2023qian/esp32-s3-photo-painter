@@ -151,14 +151,20 @@ ul{margin:10px 0 0 20px;line-height:1.9}
 code{background:#fff;border:2px solid var(--ink);padding:2px 6px;font:700 12px var(--mono)}
 
 /* ---------- 设置页：<fieldset><legend> 分区 + <label><span>名</span><input> 字段 ---------- */
+/* 字段在分区内多列排布：否则每个输入框都会拉成整行宽，右侧只剩一排空长条 */
 fieldset{border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh-sm);
-  padding:16px;margin:0 0 18px;min-width:0}
-legend{font:900 12px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
-  background:var(--ink);color:#fff;padding:7px 11px}
-label{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;min-width:0}
+  padding:18px;margin:0 0 18px;min-width:0;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
+  gap:2px 26px;align-items:start}
+legend{grid-column:1/-1;justify-self:start;
+  font:900 12px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
+  background:var(--ink);color:#fff;padding:7px 11px;margin-bottom:10px}
+/* 分区里的整行内容（渠道行、说明段落、说明容器）横跨所有列 */
+fieldset>div,fieldset>p,fieldset>.ch-row,fieldset>table,fieldset>pre{grid-column:1/-1}
+label{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin-bottom:12px;min-width:0}
 label>span{font:800 11px/1.4 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--ink2);min-width:96px;flex:0 0 auto}
-label>input,label>select{flex:1 1 200px;min-width:0}
+  color:var(--ink2);min-width:92px;flex:0 0 auto}
+label>input,label>select{flex:1 1 120px;min-width:0}
 input[type=checkbox]{width:20px;height:20px;margin:0;flex:0 0 auto;accent-color:var(--ink)}
 
 /* ---------- fieldset / 渠道行里的裸按钮 ---------- */
