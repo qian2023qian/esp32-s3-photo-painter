@@ -36,12 +36,33 @@ h1{font:900 clamp(26px,4.5vw,40px)/1.05 var(--sans);letter-spacing:-.8px;text-tr
 .container{max-width:1600px;margin:0 auto}
 
 /* ---------- 页签栏 ---------- */
+/* 导航三档，与固件 WebUI 一致：<641 底部页签 / 641~1399 顶栏 / >=1400 左侧栏 */
 .nav{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 20px}
 .nav a{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;background:#fff;
   border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);text-decoration:none;
   font:800 14px var(--sans);letter-spacing:.4px;white-space:nowrap}
 .nav a:hover{background:var(--y)}
 .nav a.on{background:var(--y)}
+@media(max-width:640px){
+  .nav{position:fixed;left:0;right:0;bottom:0;z-index:40;margin:0;padding:8px;
+    background:#fff;border-top:var(--bd) solid var(--ink);
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px}
+  .nav a{justify-content:center;min-height:48px;padding:0 6px;font-size:12px;box-shadow:none}
+  body{padding-bottom:120px}
+}
+@media(min-width:1400px){
+  /* 体侧栏 + 内容列：不动标记，直接把 body 变成网格，非 nav 的子元素一律进第 2 列 */
+  body{display:grid;grid-template-columns:250px minmax(0,1fr);gap:0;align-content:start;
+    padding:0 0 0 0}
+  .nav{grid-column:1;grid-row:1/span 200;position:sticky;top:0;align-self:start;height:100vh;
+    flex-direction:column;flex-wrap:nowrap;gap:10px;margin:0;padding:22px 16px 18px;
+    background:#fff;border-right:var(--bd) solid var(--ink);overflow:auto}
+  .nav a{width:100%;justify-content:flex-start}
+  .nav::before{content:"INKTIME";display:block;font:900 19px/1 var(--sans);letter-spacing:-.4px;
+    text-transform:uppercase;padding:0 4px 16px;margin-bottom:8px;border-bottom:var(--bd) solid var(--ink)}
+  body>*:not(.nav){grid-column:2;min-width:0;margin-left:26px;margin-right:26px}
+  body>h1:first-of-type{margin-top:26px}
+}
 
 /* ---------- 通用块 ---------- */
 .panel,.sliders,.bar,.controls,.save-row,.info-bar,.actions{
@@ -63,20 +84,24 @@ h1{font:900 clamp(26px,4.5vw,40px)/1.05 var(--sans);letter-spacing:-.8px;text-tr
 .tag-o{background:var(--r);color:#fff}
 .tag-n{background:var(--ink);color:#fff}
 
-.btn-send,.btn-save,.bar button,.actions button,.pager a{
+/* 所有裸 button 一律 v3 风格：此前只覆盖了 fieldset 内的，
+   页面底部的「保存配置」等仍是浏览器默认样式 */
+button,.btn-send,.btn-save,.bar button,.actions button,.pager a{
   display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:0 16px;
   background:#fff;color:var(--ink);border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);cursor:pointer;
   font:800 14px var(--sans);letter-spacing:.3px;text-decoration:none;
   transition:transform .06s,box-shadow .06s}
-.btn-send:hover,.btn-save:hover,.bar button:hover,.actions button:hover,.pager a:hover{background:var(--y)}
-.btn-send:active,.btn-save:active,.bar button:active,.actions button:active,.pager a:active{
+button:hover,.btn-send:hover,.btn-save:hover,.bar button:hover,.actions button:hover,.pager a:hover{background:var(--y)}
+button:active,.btn-send:active,.btn-save:active,.bar button:active,.actions button:active,.pager a:active{
   transform:translate(4px,4px);box-shadow:0 0 0 var(--ink)}
 .btn-send{width:100%;margin-top:12px}
 .actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
 .actions button.sec{background:var(--b);color:#fff}
 .actions button.orange{background:var(--y)}
 .actions button.red{background:var(--r);color:#fff}
-.actions button:hover{filter:brightness(1.06)}
+.actions button.sec:hover{background:var(--b)}
+.actions button.orange:hover{background:var(--y)}
+.actions button.red:hover{background:var(--r)}
 
 /* ---------- 表单控件 ---------- */
 input[type=text],input[type=password],input[type=number],input:not([type]),select{
@@ -172,9 +197,6 @@ label>input,label>select{flex:1 1 120px;min-width:0}
 input[type=checkbox]{width:20px;height:20px;margin:0;flex:0 0 auto;accent-color:var(--ink)}
 
 /* ---------- fieldset / 渠道行里的裸按钮 ---------- */
-fieldset button,.ch-row button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;
-  padding:0 14px;background:#fff;color:var(--ink);border:var(--bd) solid var(--ink);box-shadow:3px 3px 0 var(--ink);
-  cursor:pointer;font:800 12px var(--sans);text-transform:uppercase;letter-spacing:.4px}
-fieldset button:hover,.ch-row button:hover{background:var(--y)}
+fieldset button,.ch-row button{min-height:38px;padding:0 14px;font-size:12px;box-shadow:3px 3px 0 var(--ink)}
 .ch-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .ch-row input{flex:1 1 200px;min-width:0}

@@ -902,6 +902,7 @@ _SIM_TEMPLATE = """<!doctype html>
 <div class="nav">
   <a href="/review">📷 照片库</a>
   <a href="/sim">🎨 渲染推送</a>
+  <a href="/picker">🧪 快速推送</a>
   <a href="/settings">⚙️ 设置</a>
 </div>
 <div class="bar">
@@ -1424,6 +1425,7 @@ _SETTINGS_HTML = """<!doctype html>
 <div class="nav">
   <a href="/review">📷 照片库 /review</a>
   <a href="/sim">🎨 渲染推送 /sim</a>
+  <a href="/picker">🧪 快速推送 /picker</a>
   <a href="/settings">⚙️ 设置 /settings</a>
 </div>
 <div class="actions">
