@@ -1397,6 +1397,21 @@ window.sendEpd=sendEpd;window.sendOd=sendOd;window.fileChanged=fileChanged;windo
 </script></body></html>"""
 
 
+# ================= 入口页 =================
+# 说明：README 与启动横幅都把 http://<host>:<port>/ 当作入口地址，
+# 但此前只注册了 /review /picker /sim /settings，根路径没有路由 → 打开必然 404。
+@app.get("/")
+def index():
+    """根路径跳转到主页面 /review。"""
+    return redirect("/review")
+
+
+@app.get("/favicon.ico")
+def favicon():
+    """浏览器默认会请求 favicon；不提供时每次访问都在日志里留一条 404。"""
+    return Response(status=204)
+
+
 @app.get("/review")
 def review():
     _require_webui_enabled()
@@ -1861,7 +1876,8 @@ def main(host: str | None = None, port: int | None = None) -> None:
     print(f"[AI-Picker] IMAGE_DIR: {IMAGE_DIR}")
     print(f"[AI-Picker] OUT: {OUTPUT_DIR}")
     print(f"[AI-Picker] listen: {h}:{p}")
-    print(f"[AI-Picker] open: http://127.0.0.1:{p}/  (本机)")
+    print(f"[AI-Picker] open: http://127.0.0.1:{p}/  (本机；根路径会跳到 /review)")
+    print(f"[AI-Picker] pages: /review 照片库 · /picker 渲染推送 · /sim 模拟 · /settings 设置")
     app.run(host=h, port=p, debug=False)
 
 
