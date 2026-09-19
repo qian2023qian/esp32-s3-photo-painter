@@ -248,6 +248,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
    repeating-linear-gradient(90deg,rgba(31,34,38,.18) 0 1px,transparent 1px 3px),linear-gradient(150deg,#e6dfa4,#8a9a86)}
 .cmp figcaption{margin-top:8px;font-size:11.5px;color:var(--ink3);letter-spacing:.4px}
 details{border:1px solid var(--rule);background:var(--card);margin-top:14px}
+/* 上传面板：与图片列表同页（默认收起，选完图展开）—— 传完就地刷新下方列表并高亮新增项 */
+details.upl{margin:0 0 20px;border-color:var(--ink)}
+details.upl>summary{font:600 16px var(--serif);letter-spacing:.2px}
+details.upl>summary:after{content:"⌃"}
+details.upl[open]>summary:after{content:"⌄"}
+.uplbody{padding:2px 14px 16px}
+.uplbody .sec{margin-top:16px}
 details>summary{padding:13px 14px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;
   align-items:center;font-size:14px;font-weight:600}
 details>summary::-webkit-details-marker{display:none}
@@ -319,9 +326,6 @@ details .body{padding:14px}
       <svg viewBox="0 0 24 24"><path d="M3 12h3.5l2.5 6.5L13 5l3 7h5"/></svg>状态</button>
     <button data-p="p-photos">
       <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="1"/><circle cx="8.5" cy="10" r="1.4"/><path d="m4 17 5-4 4 3 3-2.2 4 3.2"/></svg>图片</button>
-    <button data-p="p-upload">
-      <svg viewBox="0 0 24 24"><path d="M12 16.5V5.5m0 0L7.5 10M12 5.5 16.5 10"/><path d="M4 15.5v3.5h16v-3.5"/></svg>上传
-      <span class="badge">6</span></button>
     <button data-p="p-play">
       <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M10 9.5v5l4.5-2.5z"/></svg>播放</button>
     <button data-p="p-settings">
@@ -386,36 +390,10 @@ details .body{padding:14px}
       <div class="rt">第 <b>2</b> / 6 页<br>共 <b>58</b> 张</div>
     </div>
 
-    <div class="inlinerow" style="margin-bottom:16px">
-      <label class="f grow" style="margin:0"><span class="k">播放目录</span>
-        <select><option>（根目录）· 58 张</option><option>猫咪 · 24 张</option><option>风景 · 31 张</option><option>梗图 · 12 张</option></select>
-      </label>
-      <div class="seg" style="flex:0 0 auto">
-        <button aria-pressed="true">最新</button><button>序号</button><button>随机一天</button><button>仅看已上屏</button>
-      </div>
-    </div>
-
-    <div class="contact">
-      <div class="cell" aria-current="true"><span class="im"></span><span class="lb"><span>001</span><span class="on">屏上</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>002</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>003</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>004</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>005</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>006</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>007</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>008</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>009</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>010</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>011</span><span>—</span></span></div>
-      <div class="cell"><span class="im"></span><span class="lb"><span>012</span><span>—</span></span></div>
-    </div>
-    <div class="pager"><a class="dis">‹</a><a>1</a><a aria-current="page">2</a><a>3</a><a>4</a><a>5</a><a>6</a><a>›</a></div>
-  </section>
-
-  <!-- ================= 上传 ================= -->
-  <section id="p-upload" class="hidden">
-    <div class="head">
-      <div><h1>上传</h1><p>图片在浏览器端完成缩放与 6 色抖动，设备只负责落盘与刷屏</p></div>
+    <!-- 上传（与图片列表合并：传完就地刷新列表并高亮新增项） -->
+    <details class="upl" open>
+      <summary>上传新照片</summary>
+      <div class="uplbody">
       <div class="rt">上传到<br><b>根目录</b></div>
     </div>
 
@@ -468,7 +446,37 @@ details .body{padding:14px}
         </div>
       </div>
     </div>
+      </div>
+    </details>
+
+    <div class="inlinerow" style="margin-bottom:16px">
+      <label class="f grow" style="margin:0"><span class="k">播放目录</span>
+        <select><option>（根目录）· 58 张</option><option>猫咪 · 24 张</option><option>风景 · 31 张</option><option>梗图 · 12 张</option></select>
+      </label>
+      <div class="seg" style="flex:0 0 auto">
+        <button aria-pressed="true">最新</button><button>序号</button><button>随机一天</button><button>仅看已上屏</button>
+      </div>
+    </div>
+
+    <div class="contact">
+      <div class="cell" aria-current="true"><span class="im"></span><span class="lb"><span>001</span><span class="on">屏上</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>002</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>003</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>004</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>005</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>006</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>007</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>008</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>009</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>010</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>011</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>012</span><span>—</span></span></div>
+    </div>
+    <div class="pager"><a class="dis">‹</a><a>1</a><a aria-current="page">2</a><a>3</a><a>4</a><a>5</a><a>6</a><a>›</a></div>
   </section>
+
+  <!-- ================= 上传 ================= -->
+
 
   <!-- ================= 播放 ================= -->
   <section id="p-play" class="hidden">

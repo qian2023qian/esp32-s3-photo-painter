@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fdfbf5">
+<title>相框仪表盘 · 设计稿 v3（新粗野主义 / 大胆版）</title>
+<style>
+/* ==========================================================================
+   设计稿 v3 —— 新粗野主义（Neo-brutalism）
+   刻意夸张：3px 黑边、硬投影（无模糊）、满饱和的墨水屏六色、
+   超粗标题、按下会“陷进去”的按钮、警示条式的色标。
+   结构：与 v2 同一套信息架构（状态 / 图片（含上传）/ 播放 / 设置），
+   响应式：≥1024 侧栏+多列，641~1023 顶栏，<641 底部页签。
+   自检：?w=NNN&measure=1（见脚本末尾）
+   ========================================================================== */
+:root{
+  --paper:#fdfbf5; --ink:#0a0a0a; --ink2:#5b5b5b;
+  --y:#ffd400; --r:#ff4438; --b:#2f6bff; --g:#19c37d;
+  --bd:3px; --sh:6px 6px 0 var(--ink); --sh-sm:4px 4px 0 var(--ink);
+  --sans:"Segoe UI",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --maxw:1560px; --navh:60px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{
+  font:16px/1.5 var(--sans);color:var(--ink);background:var(--paper);
+  /* 底色铺一层极淡方格纸，呼应“仪表”的网格感 */
+  background-image:linear-gradient(rgba(10,10,10,.045) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(10,10,10,.045) 1px,transparent 1px);
+  background-size:22px 22px;
+  padding-bottom:calc(var(--navh) + 2px + env(safe-area-inset-bottom,0px));
+}
+button,input,select{font:inherit;color:inherit}
+img{max-width:100%;display:block}
+
+/* ---------- 警示条：6 色色标做成一条“封箱胶带” ---------- */
+.tape{height:12px;background:repeating-linear-gradient(90deg,
+  var(--ink) 0 26px,#fff 26px 52px,var(--y) 52px 78px,var(--r) 78px 104px,
+  var(--b) 104px 130px,var(--g) 130px 156px);border-bottom:var(--bd) solid var(--ink)}
+
+/* ---------- 区块 / 卡片 ---------- */
+.blk{background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh)}
+.blk+.blk{margin-top:26px}
+.pad{padding:18px}
+h2.sec{
+  display:inline-block;font:900 15px/1 var(--sans);letter-spacing:2.6px;text-transform:uppercase;
+  background:var(--ink);color:#fff;padding:9px 13px;margin:34px 0 14px;
+}
+h2.sec.y{background:var(--y);color:var(--ink)}
+h2.sec.r{background:var(--r);color:#fff}
+h2.sec:first-child{margin-top:0}
+.hd{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:8px}
+.hd h1{font:900 clamp(34px,7vw,58px)/0.95 var(--sans);letter-spacing:-1.5px;text-transform:uppercase}
+.hd h1 em{font-style:normal;background:var(--y);box-shadow:inset 0 -0.16em 0 var(--y),0 0 0 0;padding:0 6px}
+.hd .rt{font:700 12px/1.8 var(--mono);text-align:right}
+.hd .rt b{background:var(--g);padding:2px 6px}
+
+/* ---------- 数据块 ---------- */
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.tile{background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);padding:14px;min-width:0}
+.tile .l{font:800 11px/1 var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2)}
+.tile .v{font:900 clamp(26px,5vw,36px)/1 var(--sans);margin-top:8px;letter-spacing:-1px;
+  display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums}
+.tile .v span{font:700 13px var(--sans)}
+.tile.hi{background:var(--y)}
+.tile.hi2{background:var(--g);color:#04231a}
+.meter{height:10px;border:2px solid var(--ink);background:#fff;margin-top:10px;overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--g);border-right:2px solid var(--ink)}
+.meter.low>i{background:var(--r)}
+@media(min-width:641px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* ---------- 按钮：硬投影 + 按下塌陷 ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;
+  background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);cursor:pointer;
+  font:800 15px var(--sans);letter-spacing:.3px;transition:transform .06s,box-shadow .06s;text-transform:uppercase}
+.btn:hover{background:var(--y)}
+.btn:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--ink)}
+.btn.pri{background:var(--ink);color:#fff}
+.btn.pri:hover{background:var(--b)}
+.btn.y{background:var(--y)}
+.btn.g{background:var(--g);color:#04231a}
+.btn.r{background:var(--r);color:#fff}
+.btn.sm{min-height:38px;font-size:13px;padding:0 12px;box-shadow:3px 3px 0 var(--ink)}
+.btn.wide{width:100%}
+.btnrow{display:flex;gap:14px;flex-wrap:wrap}
+.btnrow .btn{flex:1 1 auto}
+
+/* ---------- 表单 ---------- */
+.f{display:block;margin-bottom:16px;min-width:0}
+.f>span.k{display:block;font:800 11px/1 var(--sans);letter-spacing:1.6px;text-transform:uppercase;
+  color:var(--ink2);margin-bottom:7px}
+input[type=text],input[type=password],input[type=number],select{
+  width:100%;min-width:0;height:46px;padding:0 12px;background:#fff;color:var(--ink);
+  border:var(--bd) solid var(--ink);outline:none;appearance:none;font-weight:700}
+input:focus,select:focus{background:#fffbe6;box-shadow:var(--sh-sm)}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 20px,calc(100% - 12px) 20px;background-size:6px 6px,6px 6px;
+  background-repeat:no-repeat;padding-right:36px}
+.irow{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.irow .grow{flex:1 1 190px;min-width:0}
+
+.sw{position:relative;width:64px;height:34px;border:var(--bd) solid var(--ink);background:#fff;cursor:pointer;flex:0 0 auto}
+.sw:after{content:"";position:absolute;top:2px;left:2px;width:24px;height:24px;background:var(--ink);transition:.14s}
+.sw[aria-checked="true"]{background:var(--g)}
+.sw[aria-checked="true"]:after{left:32px}
+
+.seg{display:flex;border:var(--bd) solid var(--ink);background:#fff;flex-wrap:wrap;box-shadow:var(--sh-sm)}
+.seg button{flex:1 1 auto;min-width:0;min-height:44px;border:0;border-right:2px solid var(--ink);
+  background:transparent;cursor:pointer;font:800 14px var(--sans);padding:0 14px;text-transform:uppercase}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.seg.y button[aria-pressed="true"]{background:var(--y);color:var(--ink)}
+
+/* 时 / 分 */
+.time{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:12px;align-items:end}
+.step{display:flex;border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh-sm);min-width:0}
+.step input{flex:1;width:auto;min-width:0;height:52px;border:0;background:transparent;text-align:center;
+  font:900 24px var(--sans);appearance:textfield;font-variant-numeric:tabular-nums}
+.step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.step button{width:46px;height:52px;flex:0 0 auto;border:0;background:transparent;cursor:pointer;font:900 22px var(--sans)}
+.step button:hover{background:var(--y)}
+.step button:first-child{border-right:2px solid var(--ink)}
+.step button:last-child{border-left:2px solid var(--ink)}
+.time .u{font:800 12px var(--sans);letter-spacing:1px;text-transform:uppercase;padding-bottom:18px}
+.hint{display:inline-block;font:800 12px var(--mono);background:var(--b);color:#fff;padding:5px 9px}
+
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;min-width:0;height:34px;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:10px;background:#fff;border:2px solid var(--ink)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:26px;background:var(--ink);
+  margin-top:-10px;border:2px solid var(--ink)}
+.sl{display:grid;grid-template-columns:58px minmax(0,1fr) 46px;gap:12px;align-items:center;margin-bottom:6px}
+.sl .k{font:800 11px var(--sans);letter-spacing:1px;text-transform:uppercase;color:var(--ink2)}
+.sl .val{font:800 13px var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---------- 图片网格 ---------- */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.ph{border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh-sm);cursor:pointer;min-width:0;
+  transition:transform .08s,box-shadow .08s}
+.ph:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 var(--ink)}
+.ph[aria-current="true"]{background:var(--y)}
+.ph .im{aspect-ratio:1;border-bottom:2px solid var(--ink);display:block;background-color:currentColor;
+  background-image:repeating-linear-gradient(0deg,rgba(10,10,10,.16) 0 1px,transparent 1px 3px),
+   repeating-linear-gradient(90deg,rgba(10,10,10,.16) 0 1px,transparent 1px 3px),
+   linear-gradient(150deg,rgba(255,255,255,.6),rgba(0,0,0,.22))}
+.ph:nth-child(6n+1){color:#cfd4d6}.ph:nth-child(6n+2){color:#a8b39c}
+.ph:nth-child(6n+3){color:#e3d97f}.ph:nth-child(6n+4){color:#d9a79c}
+.ph:nth-child(6n+5){color:#a9b6d8}.ph:nth-child(6n){color:#8d968f}
+.ph .lb{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;
+  font:800 11px var(--mono)}
+.ph .on{background:var(--g);color:#04231a;padding:1px 5px}
+@media(min-width:641px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:1024px){.grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+
+.pager{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.pager a{min-width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;
+  border:var(--bd) solid var(--ink);background:#fff;color:var(--ink);text-decoration:none;font:800 14px var(--mono);
+  box-shadow:3px 3px 0 var(--ink)}
+.pager a[aria-current="page"]{background:var(--ink);color:#fff}
+.pager a.dis{opacity:.4}
+
+/* ---------- 上传（与图片同页） ---------- */
+.upl{border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh);margin-bottom:24px}
+.upl>summary{padding:14px 16px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;
+  align-items:center;font:900 17px var(--sans);letter-spacing:.4px;text-transform:uppercase;background:var(--y)}
+.upl>summary::-webkit-details-marker{display:none}
+.upl>summary:after{content:"▼";font-size:12px}
+.upl[open]>summary:after{content:"▲"}
+.uplbody{padding:18px}
+.drop{border:var(--bd) dashed var(--ink);background:#fffbe6;padding:26px 16px;text-align:center;cursor:pointer}
+.drop:hover{background:var(--y)}
+.drop .t{font:900 19px var(--sans);text-transform:uppercase;letter-spacing:.5px}
+.drop .s{font:700 13px var(--sans);margin-top:6px;color:var(--ink2)}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.cmp figure{border:var(--bd) solid var(--ink);background:#fff;padding:10px;min-width:0}
+.cmp .im{aspect-ratio:4/3;border:2px solid var(--ink);display:block;
+  background:repeating-linear-gradient(0deg,rgba(10,10,10,.15) 0 1px,transparent 1px 3px),
+   repeating-linear-gradient(90deg,rgba(10,10,10,.15) 0 1px,transparent 1px 3px),linear-gradient(150deg,#dfe7e9,#a9b6bb)}
+.cmp .im.epd{background:repeating-linear-gradient(0deg,rgba(10,10,10,.2) 0 1px,transparent 1px 3px),
+   repeating-linear-gradient(90deg,rgba(10,10,10,.2) 0 1px,transparent 1px 3px),linear-gradient(150deg,#e6dfa4,#8a9a86)}
+.cmp figcaption{margin-top:9px;font:900 11px var(--sans);letter-spacing:1.4px;text-transform:uppercase}
+.acc{border:var(--bd) solid var(--ink);background:#fff;margin-top:18px}
+.acc>summary{padding:13px 15px;cursor:pointer;list-style:none;font:900 14px var(--sans);letter-spacing:.6px;
+  text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.acc>summary::-webkit-details-marker{display:none}
+.acc>summary:after{content:"+"}
+.acc[open]>summary:after{content:"−"}
+.acc .body{padding:0 15px 16px;border-top:2px solid var(--ink);padding-top:16px}
+.prog{height:16px;border:var(--bd) solid var(--ink);background:#fff;margin:14px 0;overflow:hidden}
+.prog>i{display:block;height:100%;width:58%;background:repeating-linear-gradient(45deg,var(--g) 0 8px,#0f9c63 8px 16px)}
+.blist{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.bitem{display:flex;align-items:center;gap:12px;border:2px solid var(--ink);background:#fff;padding:8px 10px;min-width:0}
+.bitem .th{width:38px;height:38px;flex:0 0 auto;border:2px solid var(--ink);background:
+  repeating-linear-gradient(0deg,rgba(10,10,10,.16) 0 1px,transparent 1px 3px),
+  repeating-linear-gradient(90deg,rgba(10,10,10,.16) 0 1px,transparent 1px 3px),linear-gradient(150deg,#cbd5d7,#96a4aa)}
+.bitem .nm{flex:1;min-width:0;font:700 12px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{flex:0 0 auto;font:900 11px var(--sans);letter-spacing:.6px;padding:4px 8px;border:2px solid var(--ink);text-transform:uppercase}
+.st.ok{background:var(--g)}.st.wait{background:var(--b);color:#fff}.st.err{background:var(--r);color:#fff}
+
+/* ---------- 版心 ---------- */
+main{max-width:var(--maxw);margin:0 auto;padding:22px 18px 60px;min-width:0}
+@media(min-width:641px){main{padding:26px 26px 70px}}
+@media(min-width:1024px){.shell{display:grid;grid-template-columns:auto minmax(0,1fr);justify-content:center}
+  main{padding:34px 46px 80px;max-width:1160px;margin:0}}
+.cols{display:grid;gap:26px;grid-template-columns:minmax(0,1fr)}
+.cols>*{min-width:0}
+@media(min-width:1024px){
+  .cols.c2{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}
+  .cols.c2b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+}
+.hidden{display:none!important}
+
+/* ---------- 导航：手机底部 / 平板顶栏 / PC 侧栏 ---------- */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fff;border-top:var(--bd) solid var(--ink);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+.nav .brand,.nav .foot{display:none}
+.tabs{display:flex;width:100%;max-width:var(--maxw);margin:0 auto}
+.tabs button{flex:1;min-width:0;border:0;background:transparent;cursor:pointer;padding:10px 2px 9px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;font:800 11px var(--sans);
+  letter-spacing:.6px;text-transform:uppercase;border-top:4px solid transparent}
+.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.tabs button[aria-selected="true"]{background:var(--y);border-top-color:var(--ink)}
+.tabs .badge{background:var(--r);color:#fff;font:900 10px/1 var(--sans);padding:3px 5px;border:2px solid var(--ink)}
+@media(min-width:641px){
+  body{padding-bottom:0}
+  .nav{position:sticky;top:0;bottom:auto;border-top:0;border-bottom:var(--bd) solid var(--ink);
+    display:flex;align-items:center;gap:16px;padding:0 18px;height:var(--navh)}
+  .nav .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .nav .brand b{font:900 17px var(--sans);letter-spacing:-.4px;text-transform:uppercase;white-space:nowrap}
+  .nav .brand small{display:block;font:700 10px var(--mono);color:var(--ink2)}
+  .tabs{width:auto;margin:0 0 0 auto;gap:8px;flex:0 1 auto}
+  .tabs button{flex:0 0 auto;flex-direction:row;gap:8px;padding:9px 14px;font-size:13px;border-top:0;
+    border:2px solid transparent}
+  .tabs button[aria-selected="true"]{border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+}
+@media(min-width:1024px){
+  .nav{position:sticky;top:0;height:100vh;flex-direction:column;align-items:stretch;gap:0;
+    border-bottom:0;border-right:var(--bd) solid var(--ink);padding:22px 16px;width:250px}
+  .nav .brand{padding:0 4px 18px;border-bottom:var(--bd) solid var(--ink)}
+  .nav .brand b{font-size:19px}
+  .tabs{flex-direction:column;margin:18px 0 0;gap:12px}
+  .tabs button{flex:1 1 auto;justify-content:flex-start;padding:12px 13px;font-size:14px}
+  .nav .foot{display:block;margin-top:auto;padding:14px 4px 0;border-top:var(--bd) solid var(--ink);
+    font:700 11px/1.8 var(--mono);color:var(--ink2)}
+}
+
+/* ---------- 弹层 / 吐司 ---------- */
+.bd{position:fixed;inset:0;background:rgba(10,10,10,.55);z-index:50;opacity:0;pointer-events:none;transition:.18s}
+.bd.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;background:#fff;border-top:var(--bd) solid var(--ink);
+  padding:18px 18px calc(22px + env(safe-area-inset-bottom,0px));transform:translateY(103%);transition:.22s cubic-bezier(.2,.8,.2,1)}
+.sheet.on{transform:translateY(0)}
+@media(min-width:1024px){
+  .sheet{left:50%;right:auto;bottom:auto;top:50%;width:520px;margin-left:-260px;border:var(--bd) solid var(--ink);
+    box-shadow:12px 12px 0 var(--ink);transform:translateY(-46%) scale(.97);opacity:0;transition:.16s}
+  .sheet.on{transform:translateY(-50%) scale(1);opacity:1}
+}
+.sheet h3{font:900 20px var(--sans);text-transform:uppercase;letter-spacing:-.3px}
+.sheet .mut{font:700 12px var(--mono);color:var(--ink2);margin-top:5px}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);
+  z-index:60;background:var(--ink);color:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);
+  padding:12px 18px;font:800 14px var(--sans);opacity:0;pointer-events:none;transition:.18s;max-width:90vw;text-align:center}
+@media(min-width:641px){.toast{bottom:26px}}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:var(--r)}
+.mock{display:flex;align-items:center;gap:10px;background:var(--y);border:var(--bd) solid var(--ink);
+  box-shadow:var(--sh-sm);padding:10px 14px;margin-bottom:22px;font:800 12px var(--sans);
+  letter-spacing:.8px;text-transform:uppercase}
+/* 自检结果：放在文档流最前面（不用 fixed，确保截图能截到） */
+#measure{background:var(--ink);color:#8ef0ae;font:12px/1.5 var(--mono);padding:10px 12px;
+  white-space:pre-wrap;word-break:break-all}
+</style>
+</head>
+<body>
+<div class="tape" aria-hidden="true"></div>
+
+<div class="shell">
+<nav class="nav">
+  <div class="brand">
+    <span>
+      <b>PhotoPainter</b>
+      <small>ESP32-S3 · SPECTRA 6 · 800×480</small>
+    </span>
+  </div>
+  <div class="tabs">
+    <button aria-selected="true" data-p="p-status">
+      <svg viewBox="0 0 24 24"><path d="M3 13h4l2.5 6L13 5l2.5 8H21"/></svg>状态</button>
+    <button data-p="p-photos">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="m4 17 5-4 4 3 3-2 4 3"/></svg>图片
+      <span class="badge">6</span></button>
+    <button data-p="p-play">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="M10 9.5v5l4.5-2.5z"/></svg>播放</button>
+    <button data-p="p-settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg>设置</button>
+  </div>
+  <div class="foot">v2.0.1<br>MIT LICENSE</div>
+</nav>
+
+<main>
+  <p class="mock">设计稿 v3 · 新粗野主义 · 假数据，未接入固件</p>
+
+  <!-- ================= 状态 ================= -->
+  <section id="p-status">
+    <div class="hd">
+      <h1>状<br>态</h1>
+      <div class="rt">IP <b>192.168.3.95</b><br>运行 06:12:40<br>随机 · 每 90 分钟</div>
+    </div>
+
+    <h2 class="sec y">正在显示</h2>
+    <div class="blk pad">
+      <div class="ph" style="box-shadow:none;cursor:default">
+        <span class="im" style="aspect-ratio:4/3;border-bottom:2px solid var(--ink)"></span>
+        <div class="lb"><span>006 / 058</span><span class="on">屏上</span></div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="font:800 15px var(--mono);word-break:break-all">epd_fs_-50_4_4_69_98_1785307822_6.bmp</div>
+        <div style="font:700 13px var(--mono);color:var(--ink2);margin-top:5px">2019.4.14 · 深圳 · 回忆度 92.5</div>
+      </div>
+    </div>
+
+    <h2 class="sec">设备</h2>
+    <div class="tiles">
+      <div class="tile hi"><div class="l">电池</div><div class="v">87<span>%</span></div>
+        <div class="meter"><i style="width:87%"></i></div></div>
+      <div class="tile"><div class="l">充电</div><div class="v" style="font-size:20px">未充电</div>
+        <div class="meter" style="visibility:hidden"></div></div>
+      <div class="tile"><div class="l">温度</div><div class="v">24.6<span>℃</span></div></div>
+      <div class="tile"><div class="l">湿度</div><div class="v">58<span>%</span></div></div>
+      <div class="tile"><div class="l">图片</div><div class="v">58<span>张</span></div></div>
+      <div class="tile"><div class="l">目录</div><div class="v" style="font-size:20px">根目录</div></div>
+      <div class="tile"><div class="l">间隔</div><div class="v">01:30</div></div>
+      <div class="tile hi2"><div class="l" style="color:#04321f">自动轮播</div><div class="v" style="font-size:20px">运行中</div></div>
+    </div>
+
+    <div class="btnrow" style="margin-top:26px">
+      <button class="btn">下一张</button>
+      <button class="btn y">随机一天</button>
+      <button class="btn pri">去上传</button>
+    </div>
+  </section>
+
+  <!-- ================= 图片（含上传） ================= -->
+  <section id="p-photos" class="hidden">
+    <div class="hd">
+      <h1>图<br>片</h1>
+      <div class="rt">共 <b>58</b> 张<br>第 2 / 6 页<br>目录：根目录</div>
+    </div>
+
+    <details class="upl" open>
+      <summary>上传新照片</summary>
+      <div class="uplbody">
+        <div class="drop">
+          <div class="t">点这里选照片</div>
+          <div class="s">JPG / PNG / BMP · 可多选 · 传完就地刷新下方列表</div>
+        </div>
+        <div class="btnrow" style="margin-top:18px">
+          <button class="btn pri" style="flex:2 1 200px">开始上传（6 张）</button>
+          <button class="btn">重试失败</button>
+          <button class="btn r">清空</button>
+        </div>
+        <div class="prog"><i></i></div>
+        <div class="blist">
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_0.bmp</span><span class="st ok">已上传</span></div>
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_1.bmp</span><span class="st ok">已上传</span></div>
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_2.bmp</span><span class="st wait">上传中</span></div>
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_3.bmp</span><span class="st err">失败</span></div>
+        </div>
+
+        <h2 class="sec r">效果预览</h2>
+        <div class="cmp">
+          <figure><span class="im"></span><figcaption>原图</figcaption></figure>
+          <figure><span class="im epd"></span><figcaption>墨水屏效果</figcaption></figure>
+        </div>
+
+        <details class="acc">
+          <summary>图像调节</summary>
+          <div class="body">
+            <span class="k" style="display:block;font:800 11px var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2);margin-bottom:7px">管线</span>
+            <div class="seg y"><button aria-pressed="true">epdoptimize</button><button>OpenDisplay</button></div>
+            <label class="f" style="margin-top:16px"><span class="k">抖动矩阵</span>
+              <select><option>Floyd-Steinberg</option><option>Atkinson</option><option>Jarvis-Judice-Ninke</option><option>Stucki</option><option>Burkes</option><option>Sierra-3</option><option>Sierra-2</option></select></label>
+            <div class="sl"><span class="k">亮度</span><input type="range" min="-50" max="50" value="0"><span class="val">0</span></div>
+            <div class="sl"><span class="k">对比度</span><input type="range" min="-50" max="50" value="20"><span class="val">+20</span></div>
+            <div class="sl"><span class="k">饱和度</span><input type="range" min="-50" max="50" value="20"><span class="val">+20</span></div>
+            <div class="sl"><span class="k">锐化</span><input type="range" min="0" max="100" value="50"><span class="val">50</span></div>
+            <div class="sl"><span class="k">扩散</span><input type="range" min="0" max="200" value="100"><span class="val">100</span></div>
+          </div>
+        </details>
+      </div>
+    </details>
+
+    <div class="irow">
+      <label class="f grow" style="margin:0"><span class="k">播放目录</span>
+        <select><option>（根目录）· 58 张</option><option>猫咪 · 24 张</option><option>风景 · 31 张</option></select></label>
+      <div class="seg" style="flex:0 1 auto"><button aria-pressed="true">最新</button><button>序号</button><button>已上屏</button></div>
+    </div>
+
+    <h2 class="sec">照片</h2>
+    <div class="grid">
+      <div class="ph" aria-current="true"><span class="im"></span><div class="lb"><span>001</span><span class="on">屏上</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>002</span><span>—</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>003</span><span>—</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>004</span><span>—</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>005</span><span>—</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>006</span><span>—</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>007</span><span>新</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>008</span><span>新</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>009</span><span>新</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>010</span><span>—</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>011</span><span>—</span></div></div>
+      <div class="ph"><span class="im"></span><div class="lb"><span>012</span><span>—</span></div></div>
+    </div>
+    <div class="pager"><a class="dis">‹</a><a>1</a><a aria-current="page">2</a><a>3</a><a>4</a><a>5</a><a>6</a><a>›</a></div>
+  </section>
+
+  <!-- ================= 播放 ================= -->
+  <section id="p-play" class="hidden">
+    <div class="hd">
+      <h1>播<br>放</h1>
+      <div class="rt">随机<br>每 <b>90</b> 分钟<br>休眠 23:00–07:00</div>
+    </div>
+
+    <h2 class="sec y">轮播间隔</h2>
+    <div class="blk pad">
+      <div class="time">
+        <span class="step"><button aria-label="减小时">−</button><input type="number" value="1" min="0" max="24" aria-label="小时"><button aria-label="加小时">+</button></span><span class="u">时</span>
+        <span class="step"><button aria-label="减分钟">−</button><input type="number" value="30" min="0" max="59" aria-label="分钟"><button aria-label="加分钟">+</button></span><span class="u">分</span>
+      </div>
+      <div style="margin-top:14px"><span class="hint">= 90 分钟</span></div>
+
+      <div style="display:flex;align-items:center;gap:16px;margin-top:22px;padding-top:18px;border-top:var(--bd) solid var(--ink)">
+        <div style="flex:1;min-width:0">
+          <div style="font:900 17px var(--sans);text-transform:uppercase">自动轮播</div>
+          <div style="font:700 12px var(--sans);color:var(--ink2);margin-top:3px">关掉后只手动切图</div>
+        </div>
+        <span class="sw" role="switch" aria-checked="true" tabindex="0"></span>
+      </div>
+
+      <div style="margin-top:22px;padding-top:18px;border-top:var(--bd) solid var(--ink)">
+        <span class="k" style="display:block;font:800 11px var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2);margin-bottom:9px">轮播方式</span>
+        <div class="seg y"><button aria-pressed="false">顺序</button><button aria-pressed="false">倒序</button><button aria-pressed="true">随机</button></div>
+        <p style="font:700 12px var(--sans);color:var(--ink2);margin-top:11px">随机＝洗牌不重复，一轮走完自动重洗</p>
+      </div>
+    </div>
+
+    <h2 class="sec">目录与休眠</h2>
+    <div class="blk pad">
+      <label class="f"><span class="k">播放目录</span>
+        <select><option>（根目录）· 58 张</option><option>猫咪 · 24 张</option><option>风景 · 31 张</option></select></label>
+      <div class="irow">
+        <label class="f grow" style="margin:0"><span class="k">新建分类目录</span><input type="text" placeholder="如 猫咪"></label>
+        <button class="btn">创建</button>
+      </div>
+      <div class="irow" style="margin-top:18px">
+        <label class="f grow" style="margin:0"><span class="k">停止轮播</span><input type="text" value="23:00" style="text-align:center"></label>
+        <label class="f grow" style="margin:0"><span class="k">恢复轮播</span><input type="text" value="07:00" style="text-align:center"></label>
+      </div>
+      <div class="btnrow" style="margin-top:20px"><button class="btn pri wide">保存播放设置</button></div>
+    </div>
+  </section>
+
+  <!-- ================= 设置 ================= -->
+  <section id="p-settings" class="hidden">
+    <div class="hd">
+      <h1>设<br>置</h1>
+      <div class="rt">固件 v2.0.1<br>ESP-IDF v5.5.4<br>余量 132 KB</div>
+    </div>
+
+    <h2 class="sec y">网络</h2>
+    <div class="blk pad">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="font:900 18px var(--sans);word-break:break-all">qian-home</div>
+          <div style="font:700 13px var(--mono);color:var(--ink2)">192.168.3.95</div>
+        </div>
+        <span class="st ok">已连接</span>
+      </div>
+      <div class="btnrow" style="margin:18px 0">
+        <button class="btn">扫描网络</button><button class="btn r">重置配网</button>
+      </div>
+      <label class="f"><span class="k">SSID</span><input type="text" placeholder="网络名"></label>
+      <label class="f"><span class="k">密码</span><input type="password" placeholder="••••••••"></label>
+      <button class="btn pri wide">连接</button>
+    </div>
+
+    <h2 class="sec">Home Assistant</h2>
+    <div class="blk pad">
+      <div style="display:flex;align-items:center;gap:16px;padding-bottom:18px;border-bottom:var(--bd) solid var(--ink)">
+        <div style="flex:1"><div style="font:900 17px var(--sans);text-transform:uppercase">启用 MQTT</div>
+          <div style="font:700 12px var(--sans);color:var(--ink2);margin-top:3px">自动发现温度 / 电量 / 轮播开关</div></div>
+        <span class="sw" role="switch" aria-checked="false" tabindex="0"></span>
+      </div>
+      <label class="f" style="margin-top:18px"><span class="k">Broker 地址</span><input type="text" placeholder="192.168.1.100"></label>
+      <label class="f"><span class="k">端口</span><input type="text" placeholder="1883"></label>
+      <button class="btn pri wide">保存 MQTT 设置</button>
+    </div>
+
+    <h2 class="sec r">危险操作</h2>
+    <div class="blk pad">
+      <p style="font:700 13px var(--sans);color:var(--ink2);margin-bottom:16px">
+        重启会中断正在进行的上传与墨水屏刷新。</p>
+      <button class="btn r wide">重启设备</button>
+    </div>
+    <p style="font:700 11px var(--mono);color:var(--ink2);text-align:center;margin-top:26px">
+      ESP32-S3 PHOTOPAINTER · MIT LICENSE</p>
+  </section>
+</main>
+</div><!-- /.shell -->
+
+<div class="bd" id="bd"></div>
+<div class="sheet" id="sheet">
+  <h3>显示到屏幕？</h3>
+  <p class="mut">epd_at_-50_4_4_69_98_1785307822.bmp · 序号 007</p>
+  <div class="btnrow" style="margin-top:18px">
+    <button class="btn pri" style="flex:2 1 170px">显示到屏幕</button>
+    <button class="btn r">删除</button>
+  </div>
+</div>
+<div class="toast" id="toast">已保存（轮播间隔 01:30）</div>
+
+<script type="module">
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+let tt;
+function toast(m,err){const t=$('#toast');t.textContent=m;t.className='toast on'+(err?' err':'');
+  clearTimeout(tt);tt=setTimeout(()=>t.className='toast',2200)}
+function showTab(id){
+  $$('.tabs button').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.p===id)));
+  $$('main > section').forEach(s=>s.classList.toggle('hidden',s.id!==id));
+  window.scrollTo({top:0,behavior:'instant'});
+}
+$$('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.p));
+const _h=location.hash.slice(1);
+if(_h&&document.getElementById(_h)&&document.getElementById(_h).parentElement.tagName==='MAIN')showTab(_h);
+
+$$('.sw').forEach(el=>{
+  const flip=()=>{el.setAttribute('aria-checked',el.getAttribute('aria-checked')==='true'?'false':'true');
+    toast(el.getAttribute('aria-checked')==='true'?'已开启（演示）':'已关闭（演示）')};
+  el.onclick=flip;el.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();flip()}};
+});
+$$('.seg').forEach(s=>s.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  s.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));toast('已选：'+b.textContent)}));
+$$('.step').forEach(st=>{
+  const inp=st.querySelector('input'),[dec,inc]=st.querySelectorAll('button'),max=+inp.max||99;
+  const set=v=>{v=Math.max(0,Math.min(max,v|0));inp.value=v;
+    const box=st.closest('.time');if(box){const n=box.querySelectorAll('input');
+      toast('轮播间隔 '+n[0].value+' 时 '+n[1].value+' 分')}};
+  dec.onclick=()=>set(+inp.value-1);inc.onclick=()=>set(+inp.value+1);
+});
+$$('.ph').forEach(p=>p.onclick=()=>{$('#sheet').classList.add('on');$('#bd').classList.add('on')});
+const close=()=>{$('#sheet').classList.remove('on');$('#bd').classList.remove('on')};
+$('#bd').onclick=close;
+$$('#sheet .btn').forEach(b=>b.onclick=()=>{toast(b.textContent+' — 演示');close()});
+$$('.btn').forEach(b=>{if(!b.closest('#sheet')&&!b.closest('.seg'))b.onclick=()=>toast(b.textContent.trim()+' — 演示（未接后端）')});
+
+/* 自检：?w=NNN 模拟窄屏（无头浏览器布局视口有 ~496px 下限）；?measure=1 列出越界元素 */
+const _m=(location.search.match(/[?&]w=(\d+)/)||[])[1];
+if(_m){const w=+_m;
+  document.documentElement.style.width=w+'px';document.body.style.width=w+'px';
+  const nav=document.querySelector('.nav');nav.style.width=w+'px';nav.style.left='0';nav.style.right='auto';
+  document.querySelector('main').style.maxWidth=w+'px';}
+if(location.search.indexOf('measure')>=0){
+  const refW=_m?+_m:document.documentElement.clientWidth, bad=[];
+  $$('body *').forEach(el=>{
+    if(el.id==='measure')return;
+    if(el.closest('.bd')||el.closest('.sheet')||el.closest('.toast'))return;
+    const r=el.getBoundingClientRect();
+    if(r.width===0&&r.height===0)return;
+    if(r.right>refW+1.5||r.left<-1.5){
+      bad.push(el.tagName.toLowerCase()+(el.className?'.'+String(el.className).trim().split(/\s+/).join('.'):'')
+        +'  right='+Math.round(r.right)+' w='+Math.round(r.width));
+    }
+  });
+  const pre=document.createElement('pre');pre.id='measure';
+  pre.textContent='refWidth='+refW+'  viewport='+document.documentElement.clientWidth
+    +'  bodyScrollWidth='+document.body.scrollWidth+'\noverflowCount='+bad.length
+    +'\n'+(bad.slice(0,16).join('\n')||'(none)');
+  document.body.prepend(pre);
+}
+</script>
+</body>
+</html>
