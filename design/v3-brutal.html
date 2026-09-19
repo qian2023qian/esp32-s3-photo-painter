@@ -201,10 +201,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 /* ---------- 版心 ---------- */
 main{max-width:var(--maxw);margin:0 auto;padding:22px 18px 60px;min-width:0}
 @media(min-width:641px){main{padding:26px 26px 70px}}
-/* 侧栏 + 内容作为一组居中：超宽屏两边留白对称，而不是内容靠左、右侧空一大片 */
-@media(min-width:1024px){.shell{display:grid;grid-template-columns:250px minmax(0,1fr);
-    max-width:1800px;margin:0 auto}
-  main{padding:34px 46px 80px;max-width:none;margin:0}}
+/* 侧栏贴左边（全出血），只有内容在右侧剩余区域里居中、并保持原来的宽度：
+   内容是定宽居中的，不随窗口拉伸——否则 .btn.wide 之类的元素会被拉得极宽 */
+@media(min-width:1024px){.shell{display:grid;grid-template-columns:250px minmax(0,1fr)}
+  main{padding:34px 46px 80px;max-width:1160px;margin:0 auto}}
 .cols{display:grid;gap:26px;grid-template-columns:minmax(0,1fr)}
 .cols>*{min-width:0}
 @media(min-width:1024px){
