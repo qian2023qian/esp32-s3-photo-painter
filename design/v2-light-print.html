@@ -99,7 +99,10 @@ button,input,select{font:inherit;color:inherit}
    ========================================================================== */
 main{max-width:var(--maxw);margin:0 auto;padding:20px 18px 40px;min-width:0}
 @media(min-width:641px){main{padding:24px 28px 56px}}
-@media(min-width:1024px){main{padding:30px 40px 64px;max-width:1120px;margin:0}}
+/* 侧栏 + 内容作为一组居中：超宽屏两边留白对称，而不是内容靠左、右侧空一大片 */
+@media(min-width:1024px){body{display:grid;grid-template-columns:236px minmax(0,1fr);
+    max-width:1760px;margin:0 auto}
+  main{padding:30px 40px 64px;max-width:none;margin:0}}
 
 /* ---------- 页头：编辑式标题（衬线 + 发丝线） ---------- */
 .head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;

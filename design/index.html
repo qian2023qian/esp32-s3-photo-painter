@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>相框仪表盘 · 两版设计，帮我选一个</title>
+<style>
+/* 中立风格：刻意不偏向任何一版，免得影响判断（只在卡片边框上各自暗示一下） */
+:root{--paper:#f6f4ef;--ink:#1a1a18;--ink2:#6b6660;--ink3:#8d867c;--rule:#dcd6ca;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --serif:Georgia,"Songti SC","Noto Serif SC",serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:16px/1.65 var(--sans);background:var(--paper);color:var(--ink);padding:34px 18px 70px;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1060px;margin:0 auto}
+h1{font:800 clamp(24px,4.6vw,32px)/1.2 var(--sans);letter-spacing:-.6px}
+.sub{color:var(--ink2);margin-top:10px;font-size:15px;max-width:62ch}
+.pill{display:inline-block;font:700 11px/1 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
+  background:#e9e5db;color:var(--ink2);padding:5px 9px;margin-bottom:14px}
+
+.grid{display:grid;gap:24px;margin-top:30px}
+@media(min-width:840px){.grid{grid-template-columns:1fr 1fr;align-items:start}}
+
+.card{background:#fff;padding:18px;display:flex;flex-direction:column;gap:15px}
+/* 各自暗示一下自己的风格，但不喧宾夺主 */
+.card.a{border:1px solid var(--rule);border-radius:10px}
+.card.b{border:3px solid #0a0a0a;border-radius:2px;box-shadow:8px 8px 0 #0a0a0a}
+
+.card .tag{align-self:flex-start;font:700 11px/1 var(--sans);letter-spacing:1.4px;text-transform:uppercase;padding:6px 9px}
+.card.a .tag{background:#efece4;color:var(--ink2)}
+.card.b .tag{background:#ffd400;border:2px solid #0a0a0a;color:#0a0a0a}
+
+.card h2{font:800 22px/1.25 var(--sans);letter-spacing:-.3px}
+.card.a h2{font-family:var(--serif);font-weight:700}
+.card .one{color:var(--ink2);font-size:14.5px;margin-top:-4px}
+.card ul{padding-left:19px;color:var(--ink2);font-size:14px}
+.card li{margin:5px 0}
+.card li b{color:var(--ink)}
+
+.shot{display:block;border:1px solid var(--rule);background:#fff;position:relative;overflow:hidden}
+.card.b .shot{border:2px solid #0a0a0a}
+.shot img{display:block;width:100%;height:330px;object-fit:cover;object-position:top center}
+.shot:hover img{opacity:.92}
+.hint{font-size:12px;color:var(--ink3);text-align:center}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;
+  padding:0 18px;text-decoration:none;font:700 15px var(--sans);cursor:pointer}
+.card.a .btn{background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:6px}
+.card.a .btn:hover{background:#000}
+.card.b .btn{background:#ffd400;color:#0a0a0a;border:3px solid #0a0a0a;box-shadow:4px 4px 0 #0a0a0a}
+.card.b .btn:hover{background:#ffdf3d}
+.card.b .btn:active{transform:translate(4px,4px);box-shadow:0 0 0 #0a0a0a}
+
+.note{margin-top:36px;border-top:1px solid var(--rule);padding-top:24px}
+.note h3{font:800 17px var(--sans);margin-bottom:12px}
+.note ul{padding-left:19px;color:var(--ink2);font-size:14.5px}
+.note li{margin:7px 0}
+.note li b{color:var(--ink)}
+.foot{margin-top:30px;font-size:12px;color:var(--ink3);text-align:center}
+kbd{font:600 12px/1 var(--sans);background:#fff;border:1px solid var(--rule);border-radius:4px;padding:2px 5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="pill">设计选型 · 帮我选一个</span>
+  <h1>相框仪表盘 · 两版设计</h1>
+  <p class="sub">
+    信息架构完全一样（<b>状态 · 图片（含上传）· 播放 · 设置</b>），只换视觉语言。
+    所以选哪版都不影响功能，纯粹看观感 —— 麻烦帮我挑一个，或者说说哪部分喜欢、哪部分不喜欢。
+  </p>
+
+  <div class="grid">
+    <!-- ---------- A：纸张 / 印刷 ---------- -->
+    <div class="card a">
+      <span class="tag">A · 纸张 / 印刷</span>
+      <h2>浅色、克制，像印刷品</h2>
+      <p class="one">适合长时间看，信息密度高也不累。</p>
+      <ul>
+        <li>衬线大标题 + <b>发丝分隔线</b>，不用圆角卡片和阴影</li>
+        <li>数据区做成「<b>规格表</b>」，大号衬线数字</li>
+        <li>当前照片像<b>展签</b>；图片列表像<b>接触印相样张</b></li>
+        <li>墨水屏六色做成小色标点缀</li>
+      </ul>
+      <a class="shot" href="v2-light-print.html" target="_blank" rel="noopener">
+        <img src="v2-preview.png" alt="v2 预览">
+      </a>
+      <p class="hint">↑ 点图或下面的按钮，在新标签打开可交互版本</p>
+      <a class="btn" href="v2-light-print.html" target="_blank" rel="noopener">打开 A 版体验 →</a>
+    </div>
+
+    <!-- ---------- B：新粗野主义 ---------- -->
+    <div class="card b">
+      <span class="tag">B · 新粗野主义</span>
+      <h2>白底黑粗边、硬投影，很跳</h2>
+      <p class="one">辨识度高、有意思；代价是元素更重、更"吵"。</p>
+      <ul>
+        <li><b>3px 纯黑边框 + 硬投影</b>（无模糊），按钮按下会"塌陷"</li>
+        <li>满饱和的墨水屏六色当<b>大色块</b>用，顶栏一条六色胶带</li>
+        <li><b>超大竖排标题</b>、反白标签块、印章式状态贴纸</li>
+        <li>方格纸底纹，条纹填充的进度条</li>
+      </ul>
+      <a class="shot" href="v3-brutal.html" target="_blank" rel="noopener">
+        <img src="v3-preview.png" alt="v3 预览">
+      </a>
+      <p class="hint">↑ 点图或下面的按钮，在新标签打开可交互版本</p>
+      <a class="btn" href="v3-brutal.html" target="_blank" rel="noopener">打开 B 版体验 →</a>
+    </div>
+  </div>
+
+  <div class="note">
+    <h3>如果想再细看，可以注意这几点</h3>
+    <ul>
+      <li><b>「图片」页</b>：我把上传和图片列表合并了 —— 传完就地刷新下方列表并给新图打「新」标记，不用切页。这是两版共有的改动。</li>
+      <li><b>切到「播放」页</b>：轮播间隔是<b>「时」「分」两个步进器</b>，不用敲冒号，手机上点开就是数字键盘。</li>
+      <li><b>用手机也开一次</b>：两版都是三档响应式 —— 电脑是左侧栏、平板是顶栏、手机自动变<b>底部页签</b>。手机上观感差别更大。</li>
+      <li><b>页签、开关、加减号都能点</b>，弹层和提示也会响应；但数据是假的，没接固件。</li>
+      <li>页面顶部那条"设计稿 · 假数据"提示条，正式移植时会删掉。</li>
+    </ul>
+  </div>
+
+  <p class="foot">
+    ESP32-S3 六色墨水屏相框 · 仪表盘重设计　　用 <kbd>Ctrl</kbd>+点击可在后台标签打开
+  </p>
+</div>
+</body>
+</html>
