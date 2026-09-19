@@ -13,7 +13,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{
-  font:15px/1.5 var(--sans);color:var(--ink);background:var(--paper);
+  font:16px/1.55 var(--sans);color:var(--ink);background:var(--paper);
   background-image:linear-gradient(rgba(10,10,10,.045) 1px,transparent 1px),
                    linear-gradient(90deg,rgba(10,10,10,.045) 1px,transparent 1px);
   background-size:22px 22px;
@@ -28,18 +28,18 @@ body::before{content:"";position:fixed;left:0;right:0;top:0;height:10px;z-index:
 img{max-width:100%}
 a{color:inherit}
 
-h1{font:900 clamp(22px,4vw,34px)/1.05 var(--sans);letter-spacing:-.8px;text-transform:uppercase}
-.sub{font:700 12.5px/1.6 var(--sans);color:var(--ink2);margin:8px 0 14px;max-width:88ch}
-.subtitle{display:inline-block;font:900 12px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
+h1{font:900 clamp(26px,4.5vw,40px)/1.05 var(--sans);letter-spacing:-.8px;text-transform:uppercase}
+.sub{font:700 13.5px/1.6 var(--sans);color:var(--ink2);margin:8px 0 16px;max-width:88ch}
+.subtitle{display:inline-block;font:900 13px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
   background:var(--ink);color:#fff;padding:8px 12px;margin:22px 0 12px}
-.status{font:700 12px var(--mono);color:var(--ink2)}
+.status{font:700 13px var(--mono);color:var(--ink2)}
 .container{max-width:1600px;margin:0 auto}
 
 /* ---------- 页签栏 ---------- */
 .nav{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 20px}
-.nav a{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:0 15px;background:#fff;
+.nav a{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;background:#fff;
   border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);text-decoration:none;
-  font:800 13px var(--sans);letter-spacing:.4px;white-space:nowrap}
+  font:800 14px var(--sans);letter-spacing:.4px;white-space:nowrap}
 .nav a:hover{background:var(--y)}
 .nav a.on{background:var(--y)}
 
@@ -49,11 +49,15 @@ h1{font:900 clamp(22px,4vw,34px)/1.05 var(--sans);letter-spacing:-.8px;text-tran
 .panel h2{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
   font:900 14px var(--sans);letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px}
 .cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-bottom:18px}
+/* /sim 页的 .cmp 里有 3 个面板（原图 + 两条管线），让原图独占一行并居中；
+   /picker 页只有 2 个面板，:has() 不匹配，仍是左右并排 */
+.cmp:has(> .panel:nth-child(3))> .panel:first-child{grid-column:1/-1;text-align:center}
+.cmp> .panel img{margin:0 auto;max-height:440px;object-fit:contain}
 @media(max-width:900px){.cmp{grid-template-columns:minmax(0,1fr)}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
 
 /* ---------- 标签 / 按钮 ---------- */
-.tag{font:800 10px/1 var(--sans);letter-spacing:.6px;text-transform:uppercase;padding:5px 7px;
+.tag{font:800 11px/1 var(--sans);letter-spacing:.6px;text-transform:uppercase;padding:5px 8px;
   border:2px solid var(--ink);background:#fff;white-space:nowrap}
 .tag-e{background:var(--b);color:#fff}
 .tag-o{background:var(--r);color:#fff}
@@ -62,7 +66,7 @@ h1{font:900 clamp(22px,4vw,34px)/1.05 var(--sans);letter-spacing:-.8px;text-tran
 .btn-send,.btn-save,.bar button,.actions button,.pager a{
   display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:0 16px;
   background:#fff;color:var(--ink);border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);cursor:pointer;
-  font:800 13px var(--sans);letter-spacing:.3px;text-decoration:none;
+  font:800 14px var(--sans);letter-spacing:.3px;text-decoration:none;
   transition:transform .06s,box-shadow .06s}
 .btn-send:hover,.btn-save:hover,.bar button:hover,.actions button:hover,.pager a:hover{background:var(--y)}
 .btn-send:active,.btn-save:active,.bar button:active,.actions button:active,.pager a:active{
@@ -88,9 +92,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
   margin-top:-9px;border:2px solid var(--ink)}
 .sliders{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 20px;margin-bottom:18px}
 .slider-item{display:flex;align-items:center;gap:10px;min-width:0;font:700 12px var(--sans)}
-.slider-item .key,.skey,.ch-f>span{font:800 11px/1.4 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
+.slider-item .key,.skey,.ch-f>span{font:800 12px/1.4 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
   color:var(--ink2);min-width:48px;flex:0 0 auto}
-.slider-item .val{font:800 12px var(--mono);min-width:36px;text-align:right}
+.slider-item .val{font:800 13px var(--mono);min-width:38px;text-align:right}
 
 /* ---------- 顶部工具条 / 上传区 ---------- */
 .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
@@ -101,11 +105,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 .upload-zone{border:var(--bd) dashed var(--ink);background:#fffbe6;padding:24px 16px;text-align:center;
   cursor:pointer;font:800 14px var(--sans);margin-bottom:18px}
 .upload-zone:hover{background:var(--y)}
-.info-bar{font:700 12.5px var(--sans);color:var(--ink2);margin-bottom:18px}
+.info-bar{font:700 13.5px var(--sans);color:var(--ink2);margin-bottom:18px}
 .save-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
 
 /* ---------- 消息 ---------- */
-.msg{font:700 12px var(--sans);margin-top:8px}
+.msg{font:700 13px var(--sans);margin-top:8px}
 .ok{color:#0f7a45}
 .err{color:var(--r)}
 
@@ -116,15 +120,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 .img-wrap{border-bottom:2px solid var(--ink);background:#f2efe6}
 .img-link{display:block}
 .img-wrap img{width:100%;aspect-ratio:4/3;object-fit:contain;display:block}
-.side-under{padding:6px 10px;font:800 11px var(--sans);background:var(--y);border-bottom:2px solid var(--ink)}
+.side-under{padding:7px 10px;font:800 12px var(--sans);background:var(--y);border-bottom:2px solid var(--ink)}
 .meta{display:flex;flex-direction:column;gap:5px;padding:9px 10px;min-width:0}
-.path{font:700 11px var(--mono);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.type{font:800 11px var(--sans)}
-.score{align-self:flex-start;font:800 11px var(--mono);background:var(--g);color:#04231a;
+.path{font:700 12px var(--mono);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.type{font:800 12px var(--sans)}
+.score{align-self:flex-start;font:800 12px var(--mono);background:var(--g);color:#04231a;
   border:2px solid var(--ink);padding:3px 6px}
-.reason{font:700 11.5px var(--sans);color:var(--ink)}
-.exif,.extra{font:700 11px var(--mono);color:var(--ink2)}
-.caption{font:700 11.5px var(--sans);color:var(--ink)}
+.reason{font:700 13px var(--sans);color:var(--ink)}
+.exif,.extra{font:700 12px var(--mono);color:var(--ink2)}
+.caption{font:700 13px var(--sans);color:var(--ink)}
 
 /* ---------- 评分条（/sim） ---------- */
 .srow{display:flex;align-items:center;gap:10px;margin:6px 0;min-width:0}
@@ -136,7 +140,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 .sbar-fill.fun{background:var(--r)}
 .sbar-fill.dep{background:var(--g)}
 .sbar-fill.art{background:var(--ink)}
-.sval,.sval2{font:700 11.5px var(--mono);color:var(--ink2)}
+.sval,.sval2{font:700 13px var(--mono);color:var(--ink2)}
 .sval2{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ---------- 设置页字段 ---------- */
@@ -157,12 +161,12 @@ fieldset{border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh-s
   display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
   gap:2px 26px;align-items:start}
 legend{grid-column:1/-1;justify-self:start;
-  font:900 12px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
+  font:900 13px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
   background:var(--ink);color:#fff;padding:7px 11px;margin-bottom:10px}
 /* 分区里的整行内容（渠道行、说明段落、说明容器）横跨所有列 */
 fieldset>div,fieldset>p,fieldset>.ch-row,fieldset>table,fieldset>pre{grid-column:1/-1}
 label{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin-bottom:12px;min-width:0}
-label>span{font:800 11px/1.4 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
+label>span{font:800 12px/1.4 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
   color:var(--ink2);min-width:92px;flex:0 0 auto}
 label>input,label>select{flex:1 1 120px;min-width:0}
 input[type=checkbox]{width:20px;height:20px;margin:0;flex:0 0 auto;accent-color:var(--ink)}
