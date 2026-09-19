@@ -310,6 +310,15 @@ details .body{padding:14px}
 #measure{position:fixed;left:0;top:0;right:0;z-index:99;max-height:74vh;overflow:auto;background:#191917;color:#9ff0b4;
   font:11.5px/1.4 var(--mono);padding:8px 10px;white-space:pre-wrap}
 .hidden{display:none!important}
+/* 设计稿专用：内容宽度切换（正式移植时连同顶部提示条一起删掉） */
+.wdsw{position:fixed;right:14px;bottom:16px;z-index:70;display:none;align-items:center;gap:6px;
+  background:#fff;border:1px solid var(--ink);padding:8px 10px;font:600 11.5px var(--sans);
+  box-shadow:0 2px 10px rgba(0,0,0,.08)}
+@media(min-width:1024px){.wdsw{display:flex}}
+.wdsw span{letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3)}
+.wdsw button{border:1px solid var(--rule2);background:#fff;font:600 11.5px var(--sans);padding:5px 9px;
+  cursor:pointer;color:var(--ink2)}
+.wdsw button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
 </style>
 </head>
 <body>
@@ -610,6 +619,15 @@ details .body{padding:14px}
 </div>
 <div class="toast" id="toast">已保存（轮播间隔 01:30）</div>
 
+<!-- 设计稿专用：切换内容宽度，选好后告诉我（正式移植时删掉） -->
+<div class="wdsw" id="wdsw">
+  <span>内容宽度</span>
+  <button data-w="1120">窄</button>
+  <button data-w="1400">标准</button>
+  <button data-w="1600">宽</button>
+  <button data-w="0">铺满</button>
+</div>
+
 <script type="module">
 /* 设计稿交互仅为演示：页签 / 开关 / 分段 / 步进器 / 弹层 / 吐司 */
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -645,6 +663,22 @@ const close=()=>{$('#sheet').classList.remove('on');$('#bd').classList.remove('o
 $('#bd').onclick=close;
 $$('#sheet .btn').forEach(b=>b.onclick=()=>{toast(b.textContent+' — 演示');close()});
 $$('.btn').forEach(b=>{if(!b.closest('#sheet')&&!b.closest('.seg'))b.onclick=()=>toast(b.textContent.trim()+' — 演示（未接后端）')});
+
+/* 设计稿专用：内容宽度切换（侧栏始终贴左，只改内容的定宽/居中） */
+(function(){
+  const box=document.querySelector('#wdsw'); if(!box) return;
+  const main=document.querySelector('main');
+  const btns=[...box.querySelectorAll('button')];
+  const apply=w=>{
+    main.style.maxWidth = w>0 ? w+'px' : 'none';     /* 铺满 = 不设上限 */
+    btns.forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.w===w)));
+    try{localStorage.setItem('designW',String(w))}catch(e){}
+  };
+  let cur=1400;
+  try{const s=localStorage.getItem('designW'); if(s!==null) cur=+s}catch(e){}
+  btns.forEach(b=>b.onclick=()=>{apply(+b.dataset.w);toast('内容宽度：'+b.textContent.trim())});
+  apply(cur);
+})();
 
 /* --- 窄屏自检 -------------------------------------------------------------
    手机断点设在 641px，而 Edge 无头模式布局视口最小 ~496px，因此
