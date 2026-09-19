@@ -207,7 +207,9 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px 18px 60px;min-width:0}
   main{padding:34px 46px 80px;max-width:1160px;margin:0 auto}}
 .cols{display:grid;gap:26px;grid-template-columns:minmax(0,1fr)}
 .cols>*{min-width:0}
-@media(min-width:1024px){
+/* 两栏排版只在够宽时才启用：1024~1400 之间若还分两栏，各栏只剩 ~475px，看着非常挤
+   （1366 笔记本的视口约 1318px，减去侧栏后内容仅 1068px —— 正是"太窄"的来源） */
+@media(min-width:1400px){
   .cols.c2{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}
   .cols.c2b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 }
@@ -290,6 +292,11 @@ body:has(#cw1120:checked) main{max-width:1120px}
 body:has(#cw1400:checked) main{max-width:1400px}
 body:has(#cw1600:checked) main{max-width:1600px}
 body:has(#cw0:checked) main{max-width:none}
+/* 隐藏侧栏：把侧栏那 250px 让给内容 —— 窗口不够宽时这是唯一能真正加宽内容的办法 */
+@media(min-width:1024px){
+  body:has(#cwnonav:checked) .nav{display:none}
+  body:has(#cwnonav:checked) .shell{grid-template-columns:minmax(0,1fr)}
+}
 </style>
 </head>
 <body>
@@ -546,6 +553,7 @@ body:has(#cw0:checked) main{max-width:none}
   <input type="radio" name="cw" id="cw1400" data-w="1400" checked><label for="cw1400">标准</label>
   <input type="radio" name="cw" id="cw1600" data-w="1600"><label for="cw1600">宽</label>
   <input type="radio" name="cw" id="cw0" data-w="0"><label for="cw0">铺满</label>
+  <input type="checkbox" id="cwnonav"><label for="cwnonav">隐藏侧栏</label>
   <span class="now" id="cwnow"></span>
 </div>
 
@@ -588,7 +596,8 @@ $$('.btn').forEach(b=>{if(!b.closest('#sheet')&&!b.closest('.seg'))b.onclick=()=
 (function(){
   const box=document.querySelector('#wdsw'); if(!box) return;
   const main=document.querySelector('main'), now=document.querySelector('#cwnow');
-  const radios=[...box.querySelectorAll('input')];
+  const radios=[...box.querySelectorAll('input[type=radio]')];
+  const nonav=box.querySelector('#cwnonav');
   let want=1400;
   const show=()=>{
     if(!now) return;
@@ -602,6 +611,11 @@ $$('.btn').forEach(b=>{if(!b.closest('#sheet')&&!b.closest('.seg'))b.onclick=()=
     try{localStorage.setItem('designW',String(w))}catch(e){}
   };
   radios.forEach(r=>r.addEventListener('change',()=>{ if(r.checked) apply(+r.dataset.w) }));
+  if(nonav){
+    nonav.addEventListener('change',()=>{ show();
+      try{localStorage.setItem('designNonav',nonav.checked?'1':'0')}catch(e){} });
+    try{ if(localStorage.getItem('designNonav')==='1') nonav.checked=true; }catch(e){}
+  }
   try{
     const s=localStorage.getItem('designW');
     if(s!==null){ const r=radios.find(x=>+x.dataset.w===+s); if(r){ r.checked=true; want=+s; } }
