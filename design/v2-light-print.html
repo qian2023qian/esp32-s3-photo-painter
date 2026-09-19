@@ -98,7 +98,9 @@ button,input,select{font:inherit;color:inherit}
 /* ==========================================================================
    版心
    ========================================================================== */
-main{max-width:var(--maxw);margin:0 auto;padding:20px 18px 40px;min-width:0}
+/* width:100% 不可省：main 是 grid 子项，一旦带 auto 外边距就不会被拉伸，
+   而会收缩到内容的 fit-content 宽度（曾因此让内容在宽屏下只有几百 px） */
+main{width:100%;max-width:var(--maxw);margin:0 auto;padding:20px 18px 40px;min-width:0}
 @media(min-width:641px){main{padding:24px 28px 56px}}
 /* 侧栏贴左边（全出血），只有内容在右侧剩余区域里居中、并保持原来的宽度：
    内容是定宽居中的，不随窗口拉伸，避免按钮等元素被拉得过宽 */

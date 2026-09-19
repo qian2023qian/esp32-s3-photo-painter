@@ -206,7 +206,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 .st.ok{background:var(--g)}.st.wait{background:var(--b);color:#fff}.st.err{background:var(--r);color:#fff}
 
 /* ---------- 版心 ---------- */
-main{max-width:var(--maxw);margin:0 auto;padding:22px 18px 60px;min-width:0}
+/* width:100% 不可省：main 是 grid 子项，一旦带 auto 外边距就不会被拉伸，
+   而会收缩到内容的 fit-content 宽度（曾因此让内容在宽屏下只剩 631px） */
+main{width:100%;max-width:var(--maxw);margin:0 auto;padding:22px 18px 60px;min-width:0}
 @media(min-width:641px){main{padding:26px 26px 70px}}
 /* 侧栏贴左边（全出血），只有内容在右侧剩余区域里居中、并保持原来的宽度：
    内容是定宽居中的，不随窗口拉伸——否则 .btn.wide 之类的元素会被拉得极宽 */
@@ -216,6 +218,8 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px 18px 60px;min-width:0}
 .cols>*{min-width:0}
 /* 两栏排版只在够宽时才启用：1024~1400 之间若还分两栏，各栏只剩 ~475px，看着非常挤
    （1366 笔记本的视口约 1318px，减去侧栏后内容仅 1068px —— 正是"太窄"的来源） */
+/* 状态页的「大图 + 设备」从 1024 就分两栏：单一栏时大图会高得夸张 */
+@media(min-width:1024px){.cols.status{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}}
 @media(min-width:1400px){
   .cols.c2{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}
   .cols.c2b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
@@ -343,6 +347,8 @@ body:has(#cw0:checked) main{max-width:none}
       <div class="rt">IP <b>192.168.3.95</b><br>运行 06:12:40<br>随机 · 每 90 分钟</div>
     </div>
 
+    <div class="cols c2 status">
+    <div>
     <h2 class="sec y">正在显示</h2>
     <div class="blk pad">
       <div class="ph" style="box-shadow:none;cursor:default">
@@ -355,6 +361,8 @@ body:has(#cw0:checked) main{max-width:none}
       </div>
     </div>
 
+    </div>
+    <div>
     <h2 class="sec">设备</h2>
     <div class="tiles">
       <div class="tile hi"><div class="l">电池</div><div class="v">87<span>%</span></div>
@@ -373,6 +381,8 @@ body:has(#cw0:checked) main{max-width:none}
       <button class="btn">下一张</button>
       <button class="btn y">随机一天</button>
       <button class="btn pri">去上传</button>
+    </div>
+    </div>
     </div>
   </section>
 
@@ -652,9 +662,15 @@ if(location.search.indexOf('measure')>=0){
     }
   });
   const pre=document.createElement('pre');pre.id='measure';
+  const _sh=document.querySelector('.shell'), _nv=document.querySelector('.nav'), _mn=document.querySelector('main');
+  const _w=el=>el?Math.round(el.getBoundingClientRect().width):-1;
   pre.textContent='refWidth='+refW+'  viewport='+document.documentElement.clientWidth
-    +'  bodyScrollWidth='+document.body.scrollWidth+'\noverflowCount='+bad.length
-    +'\n'+(bad.slice(0,16).join('\n')||'(none)');
+    +'  bodyScrollWidth='+document.body.scrollWidth
+    +'\n几何: innerWidth='+innerWidth+' shell='+_w(_sh)+' nav='+_w(_nv)+' main='+_w(_mn)
+    +' mainMax='+(_mn?getComputedStyle(_mn).maxWidth:'-')
+    +' shellCols='+(_sh?getComputedStyle(_sh).gridTemplateColumns:'-')
+    +' mainMargin='+(_mn?getComputedStyle(_mn).marginLeft+'/'+getComputedStyle(_mn).marginRight:'-')
+    +'\noverflowCount='+bad.length+'\n'+(bad.slice(0,16).join('\n')||'(none)');
   document.body.prepend(pre);
 }
 </script>
