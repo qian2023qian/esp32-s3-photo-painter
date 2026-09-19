@@ -20,7 +20,7 @@
   --bd:3px; --sh:6px 6px 0 var(--ink); --sh-sm:4px 4px 0 var(--ink);
   --sans:"Segoe UI",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  --maxw:1560px; --navh:60px;
+  --maxw:1600px; --navh:60px;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
@@ -569,8 +569,8 @@ body:has(#cw0:checked) main{max-width:none}
 <div class="wdsw" id="wdsw">
   <span class="cap">内容宽度</span>
   <input type="radio" name="cw" id="cw1120" data-w="1120"><label for="cw1120">窄</label>
-  <input type="radio" name="cw" id="cw1400" data-w="1400" checked><label for="cw1400">标准</label>
-  <input type="radio" name="cw" id="cw1600" data-w="1600"><label for="cw1600">宽</label>
+  <input type="radio" name="cw" id="cw1400" data-w="1400"><label for="cw1400">标准</label>
+  <input type="radio" name="cw" id="cw1600" data-w="1600" checked><label for="cw1600">宽</label>
   <input type="radio" name="cw" id="cw0" data-w="0"><label for="cw0">铺满</label>
   <input type="checkbox" id="cwnonav"><label for="cwnonav">隐藏侧栏</label>
   <span class="now" id="cwnow"></span>
@@ -617,7 +617,7 @@ $$('.btn').forEach(b=>{if(!b.closest('#sheet')&&!b.closest('.seg'))b.onclick=()=
   const main=document.querySelector('main'), now=document.querySelector('#cwnow');
   const radios=[...box.querySelectorAll('input[type=radio]')];
   const nonav=box.querySelector('#cwnonav');
-  let want=1400;
+  let want=1600;      /* 已定稿：内容宽度取「宽」档 1600px */
   const show=()=>{
     if(!now) return;
     const act=Math.round(main.getBoundingClientRect().width);
