@@ -310,15 +310,24 @@ details .body{padding:14px}
 #measure{position:fixed;left:0;top:0;right:0;z-index:99;max-height:74vh;overflow:auto;background:#191917;color:#9ff0b4;
   font:11.5px/1.4 var(--mono);padding:8px 10px;white-space:pre-wrap}
 .hidden{display:none!important}
-/* 设计稿专用：内容宽度切换（正式移植时连同顶部提示条一起删掉） */
+/* 设计稿专用：内容宽度切换（正式移植时连同顶部提示条一起删掉）
+   两条生效路径：① radio + :has() 纯 CSS（脚本没跑也能用）；② 脚本写内联 max-width */
 .wdsw{position:fixed;right:14px;bottom:16px;z-index:70;display:none;align-items:center;gap:6px;
   background:#fff;border:1px solid var(--ink);padding:8px 10px;font:600 11.5px var(--sans);
   box-shadow:0 2px 10px rgba(0,0,0,.08)}
 @media(min-width:1024px){.wdsw{display:flex}}
-.wdsw span{letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3)}
-.wdsw button{border:1px solid var(--rule2);background:#fff;font:600 11.5px var(--sans);padding:5px 9px;
-  cursor:pointer;color:var(--ink2)}
-.wdsw button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.wdsw .cap{letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3)}
+.wdsw input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.wdsw label{border:1px solid var(--rule2);background:#fff;font:600 11.5px var(--sans);padding:6px 10px;
+  cursor:pointer;color:var(--ink2);user-select:none}
+.wdsw label:hover{background:var(--paper2)}
+.wdsw input:checked+label{background:var(--ink);border-color:var(--ink);color:#fff}
+.wdsw input:focus-visible+label{outline:2px solid var(--acc);outline-offset:1px}
+.wdsw .now{font:600 11.5px var(--mono);color:var(--ink3);min-width:96px;text-align:right}
+body:has(#cw1120:checked) main{max-width:1120px}
+body:has(#cw1400:checked) main{max-width:1400px}
+body:has(#cw1600:checked) main{max-width:1600px}
+body:has(#cw0:checked) main{max-width:none}
 </style>
 </head>
 <body>
@@ -621,11 +630,12 @@ details .body{padding:14px}
 
 <!-- 设计稿专用：切换内容宽度，选好后告诉我（正式移植时删掉） -->
 <div class="wdsw" id="wdsw">
-  <span>内容宽度</span>
-  <button data-w="1120">窄</button>
-  <button data-w="1400">标准</button>
-  <button data-w="1600">宽</button>
-  <button data-w="0">铺满</button>
+  <span class="cap">内容宽度</span>
+  <input type="radio" name="cw" id="cw1120" data-w="1120"><label for="cw1120">窄</label>
+  <input type="radio" name="cw" id="cw1400" data-w="1400" checked><label for="cw1400">标准</label>
+  <input type="radio" name="cw" id="cw1600" data-w="1600"><label for="cw1600">宽</label>
+  <input type="radio" name="cw" id="cw0" data-w="0"><label for="cw0">铺满</label>
+  <span class="now" id="cwnow"></span>
 </div>
 
 <script type="module">
@@ -664,20 +674,31 @@ $('#bd').onclick=close;
 $$('#sheet .btn').forEach(b=>b.onclick=()=>{toast(b.textContent+' — 演示');close()});
 $$('.btn').forEach(b=>{if(!b.closest('#sheet')&&!b.closest('.seg'))b.onclick=()=>toast(b.textContent.trim()+' — 演示（未接后端）')});
 
-/* 设计稿专用：内容宽度切换（侧栏始终贴左，只改内容的定宽/居中） */
+/* 设计稿专用：内容宽度切换（侧栏始终贴左，只改内容的定宽/居中）
+   注意：宽度本身已由 radio + :has() 的纯 CSS 负责，这里只做持久化与“实际生效宽度”读数 */
 (function(){
   const box=document.querySelector('#wdsw'); if(!box) return;
-  const main=document.querySelector('main');
-  const btns=[...box.querySelectorAll('button')];
+  const main=document.querySelector('main'), now=document.querySelector('#cwnow');
+  const radios=[...box.querySelectorAll('input')];
+  let want=1400;
+  const show=()=>{
+    if(!now) return;
+    const act=Math.round(main.getBoundingClientRect().width);
+    now.textContent = (want>0 && act < want-4) ? act+'px（受窗口限制）' : act+'px';
+  };
   const apply=w=>{
+    want=w;
     main.style.maxWidth = w>0 ? w+'px' : 'none';     /* 铺满 = 不设上限 */
-    btns.forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.w===w)));
+    show();
     try{localStorage.setItem('designW',String(w))}catch(e){}
   };
-  let cur=1400;
-  try{const s=localStorage.getItem('designW'); if(s!==null) cur=+s}catch(e){}
-  btns.forEach(b=>b.onclick=()=>{apply(+b.dataset.w);toast('内容宽度：'+b.textContent.trim())});
-  apply(cur);
+  radios.forEach(r=>r.addEventListener('change',()=>{ if(r.checked) apply(+r.dataset.w) }));
+  try{
+    const s=localStorage.getItem('designW');
+    if(s!==null){ const r=radios.find(x=>+x.dataset.w===+s); if(r){ r.checked=true; want=+s; } }
+  }catch(e){}
+  apply(want);
+  addEventListener('resize',show);
 })();
 
 /* --- 窄屏自检 -------------------------------------------------------------
