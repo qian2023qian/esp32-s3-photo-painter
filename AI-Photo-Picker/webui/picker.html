@@ -4,40 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI 相框渲染推送</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#c9d1d9;padding:10px}
-h1{font-size:16px;margin-bottom:4px}.sub{font-size:10px;color:#8b949e;margin-bottom:8px}
-.bar{display:flex;gap:6px;align-items:center;padding:4px 8px;background:#161b22;border-radius:6px;margin-bottom:8px}
-.bar input{flex:1;padding:4px 6px;border-radius:4px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:10px;outline:none}
-.bar button{padding:4px 8px;border:none;border-radius:4px;cursor:pointer;font-size:10px;font-weight:600;background:#238636;color:#fff;white-space:nowrap}
-.upload-zone{border:2px dashed #30363d;border-radius:6px;padding:10px;text-align:center;cursor:pointer;margin-bottom:8px;font-size:12px;color:#8b949e}
-.upload-zone:hover{border-color:#58a6ff}
-.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
-.panel{background:#161b22;border-radius:6px;padding:8px}
-.panel h2{font-size:11px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
-.tag{font-size:8px;padding:1px 4px;border-radius:2px}.tag-e{background:#8250df;color:#fff}.tag-o{background:#da3633;color:#fff}
-.panel img{width:100%;max-height:420px;object-fit:contain;display:block;margin:0 auto;border-radius:3px;border:1px solid #21262d;background:#1a1a2e}
-.btn-send{width:100%;margin-top:6px;padding:5px 0;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;color:#fff}
-.msg{font-size:9px;margin-top:3px;text-align:center}.ok{color:#3fb950}.err{color:#f85149}
-.sliders{background:#161b22;border-radius:6px;padding:8px 10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 12px}
-.slider-item{display:flex;align-items:center;gap:6px;font-size:10px}
-.slider-item .key{color:#8b949e;min-width:34px}
-input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:14px;background:transparent;outline:none;cursor:pointer}
-input[type=range]::-webkit-slider-runnable-track{height:3px;background:#30363d;border-radius:2px}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;background:#58a6ff;border-radius:50%;margin-top:-4.5px;cursor:pointer;border:none}
-select{padding:2px 4px;border-radius:4px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:10px}
-.slider-item .val{color:#8b949e;min-width:24px;text-align:right}
-@media(max-width:800px){.cmp{grid-template-columns:1fr}}
-</style>
+<link rel="stylesheet" href="/lib/v3.css">
 </head>
 <body>
+<div class="nav">
+  <a href="/review">📷 照片库</a>
+  <a href="/sim">🎨 渲染推送</a>
+  <a href="/picker">🧪 快速推送</a>
+  <a href="/settings">⚙️ 设置</a>
+</div>
+
 
 <h1>AI 相框 · 渲染推送</h1>
 <p class="sub">两套管线（epdoptimize / OpenDisplay）渲染 6 色，调色后推送到 ESP32 相框（文件名 ai_&lt;时间戳&gt;.bmp）</p>
 
 <div class="bar">
-  <span style="font-size:10px;color:#8b949e;white-space:nowrap">ESP32</span>
+  <span>ESP32</span>
   <input id="esp32-host" value="192.168.4.1" placeholder="相框 IP">
   <button onclick="window.checkEsp32()">检测</button>
   <span class="msg" id="esp32-status" style="flex:1"></span>
@@ -55,7 +37,7 @@ select{padding:2px 4px;border-radius:4px;border:1px solid #30363d;background:#0d
     <canvas id="cb-cal" style="display:none"></canvas>
     <canvas id="cb-dev" style="display:none"></canvas>
     <img id="preview-epd" alt="epd">
-    <button class="btn-send" style="background:#8250df" onclick="window.sendEpd()">推送到相框</button>
+    <button class="btn-send" style="background:#2f6bff" onclick="window.sendEpd()">推送到相框</button>
     <p class="msg" id="msg-epd"></p>
   </div>
   <div class="panel">
@@ -63,7 +45,7 @@ select{padding:2px 4px;border-radius:4px;border:1px solid #30363d;background:#0d
     <canvas id="co-src" style="display:none"></canvas>
     <canvas id="co-out" style="display:none"></canvas>
     <img id="preview-od" alt="od">
-    <button class="btn-send" style="background:#da3633" onclick="window.sendOd()">推送到相框</button>
+    <button class="btn-send" style="background:#ff4438" onclick="window.sendOd()">推送到相框</button>
     <p class="msg" id="msg-od"></p>
   </div>
 </div>

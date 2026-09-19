@@ -559,217 +559,16 @@ def build_html(rows, page: int, page_size: int, total_count: int, sel_type: str 
 <head>
   <meta charset="UTF-8">
   <title>InkTime照片数据库</title>
-  <style>
-    :root{{
-      --bg: #0b0c10;
-      --panel: rgba(255,255,255,0.06);
-      --card: rgba(255,255,255,0.10);
-      --card2: rgba(255,255,255,0.08);
-      --text: rgba(255,255,255,0.92);
-      --muted: rgba(255,255,255,0.62);
-      --muted2: rgba(255,255,255,0.48);
-      --line: rgba(255,255,255,0.14);
-      --accent: #8ab4ff;
-      --accent2:#9cffd6;
-      --shadow: 0 18px 60px rgba(0,0,0,0.45);
-      --shadow2: 0 10px 28px rgba(0,0,0,0.35);
-      --radius: 14px;
-    }}
-    body{{
-      margin:0;
-      padding:0;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-      background: radial-gradient(1200px 800px at 20% 0%, rgba(138,180,255,0.18), transparent 45%),
-                  radial-gradient(900px 700px at 90% 20%, rgba(156,255,214,0.14), transparent 55%),
-                  linear-gradient(180deg, #07080b 0%, #0b0c10 40%, #0b0c10 100%);
-      color: var(--text);
-    }}
-    .container{{
-      max-width: 1320px;
-      margin: 26px auto 60px;
-      padding: 0 18px;
-    }}
-    h1{{
-      font-size: 22px;
-      margin: 0 0 8px;
-      letter-spacing: 0.2px;
-    }}
-    .subtitle{{
-      font-size: 13px;
-      color: var(--muted);
-      margin: 0 0 14px;
-      line-height: 1.35;
-    }}
-
-    .controls{{
-      display:flex;
-      flex-wrap:wrap;
-      gap: 10px;
-      align-items:center;
-      margin: 12px 0 14px;
-      font-size: 13px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 10px 12px;
-      box-shadow: var(--shadow2);
-      backdrop-filter: blur(10px);
-    }}
-    .controls label{{
-      display:inline-flex;
-      align-items:center;
-      gap: 8px;
-      color: var(--muted);
-      white-space: nowrap;
-    }}
-    .controls select{{
-      padding: 7px 10px;
-      font-size: 13px;
-      color: var(--text);
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 10px;
-      outline: none;
-    }}
-    .controls select:focus{{
-      border-color: rgba(138,180,255,0.7);
-      box-shadow: 0 0 0 3px rgba(138,180,255,0.16);
-    }}
-    .controls button{{
-      padding: 7px 12px;
-      font-size: 13px;
-      cursor: pointer;
-      color: var(--text);
-      background: rgba(255,255,255,0.10);
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 10px;
-      transition: transform .08s ease, background .15s ease, border-color .15s ease, opacity .15s ease;
-    }}
-    .controls button:hover{{
-      background: rgba(255,255,255,0.14);
-      border-color: rgba(255,255,255,0.26);
-    }}
-    .controls button:active{{
-      transform: translateY(1px);
-    }}
-    .controls button:disabled{{
-      opacity: 0.45;
-      cursor: not-allowed;
-    }}
-    .controls.pager{{
-      background: rgba(255,255,255,0.05);
-    }}
-
-    .status{{
-      font-size: 12px;
-      color: var(--muted);
-      margin: 8px 0 12px;
-    }}
-
-    .grid{{
-      display:grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 16px;
-    }}
-    .item{{
-      background: linear-gradient(180deg, var(--card) 0%, var(--card2) 100%);
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: var(--radius);
-      overflow: hidden;
-      box-shadow: var(--shadow2);
-      display:flex;
-      flex-direction:column;
-      transition: transform .12s ease, border-color .15s ease, box-shadow .15s ease;
-    }}
-    .item:hover{{
-      transform: translateY(-2px);
-      border-color: rgba(138,180,255,0.38);
-      box-shadow: var(--shadow);
-    }}
-
-    .img-wrap{{
-      width:100%;
-      background: rgba(0,0,0,0.55);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      max-height: 260px;
-      overflow:hidden;
-    }}
-    .img-wrap img{{
-      width:100%;
-      height:auto;
-      display:block;
-      object-fit: cover;
-      filter: saturate(1.04) contrast(1.02);
-    }}
-    .img-link{{ display:block; width:100%; }}
-    .img-link:link, .img-link:visited{{ text-decoration:none; }}
-
-    .side-under{{
-      padding: 10px 12px 0;
-      font-size: 12px;
-      color: var(--text);
-      line-height: 1.45;
-      word-break: break-word;
-      opacity: 0.92;
-    }}
-
-    .meta{{
-      padding: 10px 12px 12px;
-      font-size: 13px;
-      color: var(--text);
-    }}
-    .path{{
-      font-size: 11px;
-      color: var(--muted2);
-      margin-bottom: 6px;
-      word-break: break-all;
-    }}
-    .type{{
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }}
-    .score{{
-      font-size: 13px;
-      font-weight: 650;
-      margin-bottom: 6px;
-      color: var(--accent2);
-    }}
-    .reason{{
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 6px;
-      line-height: 1.45;
-    }}
-    .exif{{
-      font-size: 11px;
-      color: var(--muted2);
-      margin-bottom: 8px;
-      line-height: 1.45;
-    }}
-    .extra{{
-      font-size: 11px;
-      color: var(--muted2);
-      margin-bottom: 8px;
-      line-height: 1.45;
-    }}
-    .caption{{
-      margin-top: 6px;
-      font-size: 13px;
-      line-height: 1.55;
-      color: var(--text);
-    }}
-
-    @media (max-width: 560px){{
-      .container{{ padding: 0 14px; }}
-      .grid{{ grid-template-columns: 1fr; }}
-      .controls{{ gap: 8px; }}
-    }}
-  </style>
+  <link rel="stylesheet" href="/lib/v3.css">
 </head>
 <body>
+<div class="nav">
+  <a href="/review">📷 照片库</a>
+  <a href="/sim">🎨 渲染推送</a>
+  <a href="/picker">🧪 快速推送</a>
+  <a href="/settings">⚙️ 设置</a>
+</div>
+
   <div class="container">
     <h1>InkTime照片数据库</h1>
     <div class="subtitle">
@@ -1097,52 +896,7 @@ _SIM_TEMPLATE = """<!doctype html>
 <html lang="zh"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>墨水屏渲染 · 调色 · 推送</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;padding:24px;max-width:1080px;margin:0 auto;font-size:18px;line-height:1.6}
-h1{font-size:25px;margin-bottom:8px;color:#e6edf3}
-.sub{font-size:14px;color:#8b949e;margin-bottom:18px}
-.nav{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
-.nav a{background:#161b22;border:1px solid #30363d;color:#c9d1d9;text-decoration:none;padding:10px 22px;border-radius:10px;font-size:14px;transition:background .2s}
-.nav a:hover{background:#1f2a3a}
-.info-bar{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px 18px;font-size:14px;margin-bottom:14px}
-.srow{display:flex;align-items:center;gap:12px;margin:7px 0;font-size:14px}
-.skey{color:#8b949e;min-width:48px;flex-shrink:0}
-.sbar{flex:1;height:14px;background:#21262d;border-radius:8px;overflow:hidden}
-.sbar-fill{height:100%;border-radius:8px}
-.sbar-fill.mem{background:linear-gradient(90deg,#6fd6ff,#9cffd6)}
-.sbar-fill.bea{background:linear-gradient(90deg,#ffd36f,#ff9f6f)}
-.sbar-fill.fun{background:linear-gradient(90deg,#ff6f9f,#ffb86f)}
-.sbar-fill.dep{background:linear-gradient(90deg,#a78bfa,#7dd3fc)}
-.sbar-fill.art{background:linear-gradient(90deg,#34d399,#5eead4)}
-.sval{min-width:42px;text-align:right;color:#e6edf3}
-.sval2{flex:1;color:#c9d1d9;word-break:break-all}
-.bar{display:flex;gap:10px;align-items:center;padding:10px 14px;background:#161b22;border:1px solid #30363d;border-radius:10px;margin-bottom:14px}
-.bar input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:14px;outline:none}
-.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-.cmp .panel:first-child{grid-column:1/-1}
-.panel{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px}
-.panel h2{font-size:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;color:#e6edf3}
-.tag{font-size:10px;padding:2px 8px;border-radius:5px}.tag-e{background:#8250df;color:#fff}.tag-o{background:#da3633;color:#fff}.tag-n{background:#8b949e;color:#fff}
-.panel img{width:100%;max-height:480px;object-fit:contain;display:block;margin:0 auto;border-radius:10px;border:1px solid #21262d;background:#1a1a2e}
-.btn-send{width:100%;margin-top:10px;padding:12px 0;border:none;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600;color:#fff}
-.btn-send:hover{filter:brightness(1.1)}
-.msg{font-size:12px;margin-top:6px;text-align:center}.ok{color:#3fb950}.err{color:#f85149}
-.sliders{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
-.slider-item{display:flex;align-items:center;gap:10px;font-size:14px}
-.slider-item .key{color:#8b949e;min-width:52px}
-input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:24px;background:transparent;outline:none;cursor:pointer}
-input[type=range]::-webkit-slider-runnable-track{height:8px;background:#30363d;border-radius:5px}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;background:#58a6ff;border-radius:50%;margin-top:-9px;cursor:pointer;border:3px solid #0d1117}
-select{padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:14px}
-.slider-item .val{color:#8b949e;min-width:36px;text-align:right;font-size:14px}
-.save-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-.btn-save{background:#238636;border:none;color:#fff;border-radius:10px;padding:10px 22px;cursor:pointer;font-size:14px}
-.btn-save:hover{filter:brightness(1.1)}
-.upload{border:2px dashed #30363d;border-radius:12px;padding:16px;text-align:center;cursor:pointer;font-size:14px;color:#8b949e;margin-bottom:14px}
-.upload:hover{border-color:#58a6ff;background:#0d1117}
-@media(max-width:800px){.cmp{grid-template-columns:1fr}}
-</style></head><body>
+<link rel="stylesheet" href="/lib/v3.css"></head><body>
 <h1>墨水屏渲染 · 调色 · 推送</h1>
 <p class="sub">两套管线（epdoptimize / OpenDisplay）渲染 6 色，调色后推送到相框（ai_&lt;时间戳&gt;.bmp）</p>
 <div class="nav">
@@ -1151,7 +905,7 @@ select{padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#0
   <a href="/settings">⚙️ 设置</a>
 </div>
 <div class="bar">
-  <span style="font-size:9px;color:#8b949e;white-space:nowrap">ESP32</span>
+  <span>ESP32</span>
   <input id="esp32-host" value="{{ esp32_host }}">
 </div>
 <div class="info-bar" id="infoBar">加载中…</div>
@@ -1166,7 +920,7 @@ select{padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#0
     <canvas id="cb-cal" style="display:none"></canvas>
     <canvas id="cb-dev" style="display:none"></canvas>
     <img id="preview-epd" alt="epd">
-    <button class="btn-send" style="background:#8250df" onclick="sendEpd()">推送到相框</button>
+    <button class="btn-send" style="background:#2f6bff" onclick="sendEpd()">推送到相框</button>
     <p class="msg" id="msg-epd"></p>
   </div>
   <div class="panel">
@@ -1174,7 +928,7 @@ select{padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#0
     <canvas id="co-src" style="display:none"></canvas>
     <canvas id="co-out" style="display:none"></canvas>
     <img id="preview-od" alt="od">
-    <button class="btn-send" style="background:#da3633" onclick="sendOd()">推送到相框</button>
+    <button class="btn-send" style="background:#ff4438" onclick="sendOd()">推送到相框</button>
     <p class="msg" id="msg-od"></p>
   </div>
 </div>
@@ -1545,7 +1299,9 @@ def lib_asset(name: str):
     p = WEBUI_DIR / "lib" / Path(name).name
     if not p.exists() or not p.is_file():
         abort(404)
-    mt = "application/javascript" if p.suffix == ".js" else "application/octet-stream"
+    mt = ("application/javascript" if p.suffix == ".js"
+          else "text/css" if p.suffix == ".css"
+          else "application/octet-stream")
     return send_file(p, mimetype=mt, max_age=3600)
 
 
@@ -1663,32 +1419,7 @@ _SETTINGS_HTML = """<!doctype html>
 <html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI-Picker 设置</title>
-<style>
-*{box-sizing:border-box}
-body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;padding:24px;max-width:900px;margin:0 auto;font-size:18px;line-height:1.6}
-h1{font-size:25px;color:#e6edf3;margin-bottom:6px}
-fieldset{border:1px solid #30363d;border-radius:12px;padding:16px 18px;margin:14px 0}
-legend{font-size:14px;color:#8b949e;padding:0 8px}
-label{display:block;font-size:14px;margin:10px 0}
-label span{display:inline-block;width:260px;color:#8b949e}
-input[type=text],input[type=number],input[type=password],select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:8px;padding:8px 10px;font-size:14px;width:340px}
-input[type=text]:focus,input[type=number]:focus,input[type=password]:focus{border-color:#58a6ff;outline:none}
-input[type=checkbox]{transform:scale(1.4)}
-button{background:#238636;border:none;color:#fff;border-radius:8px;padding:10px 20px;cursor:pointer;font-size:15px}
-button:hover{filter:brightness(1.1)}
-button.sec{background:#1f6feb;margin-right:8px}button.orange{background:#bc4c00}button.red{background:#da3633}
-.actions{margin:14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.nav{display:flex;gap:12px;margin:14px 0 8px;flex-wrap:wrap}
-.nav a{background:#161b22;border:1px solid #30363d;color:#c9d1d9;text-decoration:none;padding:10px 22px;border-radius:10px;font-size:14px}
-.nav a:hover{background:#1f2a3a}
-.ch-row{border:1px solid #21262d;border-radius:12px;padding:12px;margin:10px 0}
-.ch-f{display:flex;align-items:center;margin:8px 0;gap:10px}
-.ch-f span{display:inline-block;width:88px;color:#8b949e;font-size:14px;flex-shrink:0}
-.ch-f input{flex:1;width:auto}
-.ch-row button{background:#da3633;margin-top:8px}
-pre{background:#010409;border:1px solid #30363d;border-radius:10px;padding:12px;font-size:13px;height:260px;overflow:auto;white-space:pre-wrap;color:#7ee787}
-#status{font-size:14px;color:#8b949e}
-</style></head><body>
+<link rel="stylesheet" href="/lib/v3.css"></head><body>
 <h1>AI-Photo-Picker 设置</h1>
 <div class="nav">
   <a href="/review">📷 照片库 /review</a>
@@ -1709,7 +1440,7 @@ pre{background:#010409;border:1px solid #30363d;border-radius:10px;padding:12px;
 </fieldset>
 <fieldset><legend>VLM 渠道</legend>
 <div id="channels"></div>
-<button type="button" onclick="addCh()" style="background:#30363d;color:#c9d1d9">+ 添加渠道</button>
+<button type="button" onclick="addCh()">+ 添加渠道</button>
 <label><span>单批上限</span><input name="BATCH_LIMIT" type="text"></label>
 <label><span>请求超时(秒)</span><input name="TIMEOUT" type="number"></label>
 <label><span>渠道冷却(秒)</span><input name="CHANNEL_FAILOVER_COOLDOWN_SEC" type="number"></label>
@@ -1849,11 +1580,7 @@ def browse(subpath: str = ""):
 <head>
 <meta charset="utf-8">
 <title>InkTime Files</title>
-<style>
-body {{ font-family: -apple-system,BlinkMacSystemFont,system-ui,sans-serif; padding: 24px; }}
-ul {{ line-height: 1.8; }}
-code {{ background:#f2f2f2; padding:2px 6px; border-radius:4px; }}
-</style>
+<link rel="stylesheet" href="/lib/v3.css">
 </head>
 <body>
 <h3>输出目录浏览</h3>

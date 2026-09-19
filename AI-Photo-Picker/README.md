@@ -135,6 +135,12 @@ python main.py serve [--host 0.0.0.0] [--port 8765]
 | `/picker`| 交互式渲染 + 调色 + 推送页（独立于 `sim` 的简化版） |
 | `/settings` | 编辑配置（相册路径、VLM 渠道、推送开关、调色默认值等） |
 | `/api/analyze`, `/api/render` | 一键触发分析 / 渲染（后台子进程） |
+| `/files/` | 输出目录浏览 |
+
+**外观**：四个页面共用 `webui/lib/v3.css`（新粗野主义：3px 黑边 + 硬投影 + 墨水屏六色），
+由 `/lib/v3.css` 提供。改样式只改这一个文件即可，页面本身只有 class 名依赖它；
+顶部那条六色胶带用 `body::before` 绘制，所以无需在页面里加任何标记。
+
 | `/api/stop` | 停止正在运行的 analyze / render 子进程 |
 | `/api/log/<name>` | 读取 analyze / render 子进程的实时日志 |
 | `/api/settings` | 配置的读取 / 保存 |

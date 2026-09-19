@@ -1,0 +1,170 @@
+/* ==========================================================================
+   AI-Photo-Picker · WebUI v3「新粗野主义」共享样式
+   用途：/review · /picker · /sim · /settings 四个页面共用。
+   设计意图：只覆盖既有 class 名，页面标记与 JS 一律不动，
+   因此顶部六色胶带用 body::before 绘制、区块装饰用 box-shadow 完成。
+   ========================================================================== */
+:root{
+  --paper:#fdfbf5; --ink:#0a0a0a; --ink2:#5b5b5b; --y:#ffd400; --r:#ff4438;
+  --b:#2f6bff; --g:#19c37d; --bd:3px; --sh:6px 6px 0 var(--ink); --sh-sm:4px 4px 0 var(--ink);
+  --sans:"Segoe UI",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  font:15px/1.5 var(--sans);color:var(--ink);background:var(--paper);
+  background-image:linear-gradient(rgba(10,10,10,.045) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(10,10,10,.045) 1px,transparent 1px);
+  background-size:22px 22px;
+  padding:26px 16px 70px;
+}
+/* 顶部六色胶带（v3 的识别特征，无需在页面里加标记） */
+body::before{content:"";position:fixed;left:0;right:0;top:0;height:10px;z-index:99;
+  border-bottom:var(--bd) solid var(--ink);
+  background:repeating-linear-gradient(90deg,var(--ink) 0 26px,#fff 26px 52px,var(--y) 52px 78px,
+    var(--r) 78px 104px,var(--b) 104px 130px,var(--g) 130px 156px)}
+@media(min-width:900px){body{padding:30px 26px 80px}}
+img{max-width:100%}
+a{color:inherit}
+
+h1{font:900 clamp(22px,4vw,34px)/1.05 var(--sans);letter-spacing:-.8px;text-transform:uppercase}
+.sub{font:700 12.5px/1.6 var(--sans);color:var(--ink2);margin:8px 0 14px;max-width:88ch}
+.subtitle{display:inline-block;font:900 12px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
+  background:var(--ink);color:#fff;padding:8px 12px;margin:22px 0 12px}
+.status{font:700 12px var(--mono);color:var(--ink2)}
+.container{max-width:1600px;margin:0 auto}
+
+/* ---------- 页签栏 ---------- */
+.nav{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 20px}
+.nav a{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:0 15px;background:#fff;
+  border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);text-decoration:none;
+  font:800 13px var(--sans);letter-spacing:.4px;white-space:nowrap}
+.nav a:hover{background:var(--y)}
+.nav a.on{background:var(--y)}
+
+/* ---------- 通用块 ---------- */
+.panel,.sliders,.bar,.controls,.save-row,.info-bar,.actions{
+  background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh);padding:14px;min-width:0}
+.panel h2{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  font:900 14px var(--sans);letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-bottom:18px}
+@media(max-width:900px){.cmp{grid-template-columns:minmax(0,1fr)}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+
+/* ---------- 标签 / 按钮 ---------- */
+.tag{font:800 10px/1 var(--sans);letter-spacing:.6px;text-transform:uppercase;padding:5px 7px;
+  border:2px solid var(--ink);background:#fff;white-space:nowrap}
+.tag-e{background:var(--b);color:#fff}
+.tag-o{background:var(--r);color:#fff}
+.tag-n{background:var(--ink);color:#fff}
+
+.btn-send,.btn-save,.bar button,.actions button,.pager a{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:0 16px;
+  background:#fff;color:var(--ink);border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);cursor:pointer;
+  font:800 13px var(--sans);letter-spacing:.3px;text-decoration:none;
+  transition:transform .06s,box-shadow .06s}
+.btn-send:hover,.btn-save:hover,.bar button:hover,.actions button:hover,.pager a:hover{background:var(--y)}
+.btn-send:active,.btn-save:active,.bar button:active,.actions button:active,.pager a:active{
+  transform:translate(4px,4px);box-shadow:0 0 0 var(--ink)}
+.btn-send{width:100%;margin-top:12px}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.actions button.sec{background:var(--b);color:#fff}
+.actions button.orange{background:var(--y)}
+.actions button.red{background:var(--r);color:#fff}
+.actions button:hover{filter:brightness(1.06)}
+
+/* ---------- 表单控件 ---------- */
+input[type=text],input[type=password],input[type=number],input:not([type]),select{
+  min-width:0;height:42px;padding:0 11px;background:#fff;color:var(--ink);
+  border:2px solid var(--ink);outline:none;font:700 13px var(--sans);appearance:none}
+input:focus,select:focus{background:#fffbe6;box-shadow:var(--sh-sm)}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 18px,calc(100% - 11px) 18px;background-size:6px 6px,6px 6px;
+  background-repeat:no-repeat;padding-right:32px}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1 1 90px;min-width:0;height:28px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:#fff;border:2px solid var(--ink)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:22px;background:var(--ink);
+  margin-top:-9px;border:2px solid var(--ink)}
+.sliders{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 20px;margin-bottom:18px}
+.slider-item{display:flex;align-items:center;gap:10px;min-width:0;font:700 12px var(--sans)}
+.slider-item .key,.skey,.ch-f>span{font:800 11px/1.4 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--ink2);min-width:48px;flex:0 0 auto}
+.slider-item .val{font:800 12px var(--mono);min-width:36px;text-align:right}
+
+/* ---------- 顶部工具条 / 上传区 ---------- */
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.bar>span{font:800 11px var(--sans);letter-spacing:1.2px;text-transform:uppercase;color:var(--ink2);white-space:nowrap}
+.bar input{flex:0 1 240px}
+.ch-f input{flex:1 1 220px}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.upload-zone{border:var(--bd) dashed var(--ink);background:#fffbe6;padding:24px 16px;text-align:center;
+  cursor:pointer;font:800 14px var(--sans);margin-bottom:18px}
+.upload-zone:hover{background:var(--y)}
+.info-bar{font:700 12.5px var(--sans);color:var(--ink2);margin-bottom:18px}
+.save-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+
+/* ---------- 消息 ---------- */
+.msg{font:700 12px var(--sans);margin-top:8px}
+.ok{color:#0f7a45}
+.err{color:var(--r)}
+
+/* ---------- 照片库卡片 ---------- */
+.item{background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);min-width:0;
+  display:flex;flex-direction:column;transition:transform .08s,box-shadow .08s}
+.item:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 var(--ink)}
+.img-wrap{border-bottom:2px solid var(--ink);background:#f2efe6}
+.img-link{display:block}
+.img-wrap img{width:100%;aspect-ratio:4/3;object-fit:contain;display:block}
+.side-under{padding:6px 10px;font:800 11px var(--sans);background:var(--y);border-bottom:2px solid var(--ink)}
+.meta{display:flex;flex-direction:column;gap:5px;padding:9px 10px;min-width:0}
+.path{font:700 11px var(--mono);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.type{font:800 11px var(--sans)}
+.score{align-self:flex-start;font:800 11px var(--mono);background:var(--g);color:#04231a;
+  border:2px solid var(--ink);padding:3px 6px}
+.reason{font:700 11.5px var(--sans);color:var(--ink)}
+.exif,.extra{font:700 11px var(--mono);color:var(--ink2)}
+.caption{font:700 11.5px var(--sans);color:var(--ink)}
+
+/* ---------- 评分条（/sim） ---------- */
+.srow{display:flex;align-items:center;gap:10px;margin:6px 0;min-width:0}
+.sbar{flex:1 1 auto;height:16px;min-width:60px;background:#fff;border:2px solid var(--ink);overflow:hidden}
+.sbar-fill{height:100%;background:var(--b);transition:width .25s}
+/* 五个评分维度各给一个 v3 色（原来是渐变色，改成平色更贴粗野风） */
+.sbar-fill.mem{background:var(--b)}
+.sbar-fill.bea{background:var(--y)}
+.sbar-fill.fun{background:var(--r)}
+.sbar-fill.dep{background:var(--g)}
+.sbar-fill.art{background:var(--ink)}
+.sval,.sval2{font:700 11.5px var(--mono);color:var(--ink2)}
+.sval2{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- 设置页字段 ---------- */
+.ch-f{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ch-f input{flex:1 1 220px}
+
+/* ---------- 分页 ---------- */
+.pager{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+
+/* ---------- /files 输出目录浏览（结构极简，只有 ul/code） ---------- */
+ul{margin:10px 0 0 20px;line-height:1.9}
+code{background:#fff;border:2px solid var(--ink);padding:2px 6px;font:700 12px var(--mono)}
+
+/* ---------- 设置页：<fieldset><legend> 分区 + <label><span>名</span><input> 字段 ---------- */
+fieldset{border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh-sm);
+  padding:16px;margin:0 0 18px;min-width:0}
+legend{font:900 12px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
+  background:var(--ink);color:#fff;padding:7px 11px}
+label{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;min-width:0}
+label>span{font:800 11px/1.4 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--ink2);min-width:96px;flex:0 0 auto}
+label>input,label>select{flex:1 1 200px;min-width:0}
+input[type=checkbox]{width:20px;height:20px;margin:0;flex:0 0 auto;accent-color:var(--ink)}
+
+/* ---------- fieldset / 渠道行里的裸按钮 ---------- */
+fieldset button,.ch-row button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;
+  padding:0 14px;background:#fff;color:var(--ink);border:var(--bd) solid var(--ink);box-shadow:3px 3px 0 var(--ink);
+  cursor:pointer;font:800 12px var(--sans);text-transform:uppercase;letter-spacing:.4px}
+fieldset button:hover,.ch-row button:hover{background:var(--y)}
+.ch-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ch-row input{flex:1 1 200px;min-width:0}
