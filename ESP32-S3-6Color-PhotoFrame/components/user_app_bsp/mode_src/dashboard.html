@@ -65,7 +65,8 @@ h2.sec:first-child{margin-top:0}
 .tile .l{font:800 11px/1 var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2)}
 .tile .v{font:900 clamp(26px,5vw,36px)/1 var(--sans);margin-top:8px;letter-spacing:-1px;
   display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums}
-.tile .v span{font:700 13px var(--sans)}
+/* 只作用于单位(.u)：数字是 <span id=...> 包着的，旧的 .tile .v span 会把数字一起缩小 */
+.tile .v .u{font:700 13px var(--sans)}
 .tile.hi{background:var(--y)}
 .tile.hi2{background:var(--g);color:#04231a}
 @media(min-width:641px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
@@ -278,17 +279,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
     <div>
     <h2 class="sec y">&#20256;&#24863;&#22120;</h2>
     <div class="tiles">
-      <div class="tile"><div class="l">&#28201;&#24230;</div><div class="v"><span id="s-temp">--</span><span>&#8451;</span></div></div>
-      <div class="tile"><div class="l">&#28287;&#24230;</div><div class="v"><span id="s-rh">--</span><span>%</span></div></div>
+      <div class="tile"><div class="l">&#28201;&#24230;</div><div class="v"><span id="s-temp">--</span><span class="u">&#8451;</span></div></div>
+      <div class="tile"><div class="l">&#28287;&#24230;</div><div class="v"><span id="s-rh">--</span><span class="u">%</span></div></div>
     </div>
 
     <h2 class="sec">&#30456;&#26694;&#29366;&#24577;</h2>
     <div class="tiles">
-      <div class="tile hi"><div class="l">&#22270;&#29255;&#25968;&#37327;</div><div class="v"><span id="img-count">--</span><span>&#24352;</span></div></div>
+      <div class="tile hi"><div class="l">&#22270;&#29255;&#25968;&#37327;</div><div class="v"><span id="img-count">--</span><span class="u">&#24352;</span></div></div>
       <div class="tile"><div class="l">&#24403;&#21069;&#32034;&#24341;</div><div class="v"><span id="img-index">--</span></div></div>
       <div class="tile"><div class="l">&#36718;&#25773;&#38388;&#38548;</div><div class="v" style="font-size:20px"><span id="img-interval">--</span></div></div>
       <div class="tile hi2"><div class="l" style="color:#04321f">&#36816;&#34892;&#29366;&#24577;</div><div class="v" style="font-size:20px"><span id="img-running">--</span></div></div>
-      <div class="tile"><div class="l">&#30005;&#27744;&#30005;&#21387;</div><div class="v"><span id="batt-volt">--</span><span>V</span></div></div>
+      <div class="tile"><div class="l">&#30005;&#27744;&#30005;&#21387;</div><div class="v"><span id="batt-volt">--</span><span class="u">V</span></div></div>
       <div class="tile"><div class="l">&#20805;&#30005;&#29366;&#24577;</div><div class="v" style="font-size:20px"><span id="batt-chg">--</span></div></div>
     </div>
 
