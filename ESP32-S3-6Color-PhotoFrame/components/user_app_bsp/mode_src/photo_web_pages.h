@@ -816,11 +816,16 @@ if(fileFlag&&lastOrigImg){reprocess()}}
 async function reprocess(){
 if(!sourceCanvas){sourceCanvas=document.createElement('canvas')}
 applyScale(lastOrigImg,sourceCanvas);$('label-orig').textContent='原图 ('+lastOrigImg.naturalWidth+'×'+lastOrigImg.naturalHeight+')';
-/* 旧代码只判断 fit，选「自动」时会误报成「拉伸」；改为按 applyScale 的真实结果描述 */
+/* 旧代码只判断 fit，选「自动」时会误报成「拉伸」；改为按 applyScale 的真实结果描述。
+   两种模式都给出百分比：等比留白是一个缩放比；拉伸是两个轴的缩放比（能看出变形程度） */
 var _dir=(currentImgW>currentImgH)?'横屏':'竖屏';
 var _si=scaleInfo||{fit:false,auto:false,pct:1};
+var _sx=Math.round(currentImgW/lastOrigImg.naturalWidth*100);
+var _sy=Math.round(currentImgH/lastOrigImg.naturalHeight*100);
 $('label-proc').textContent='目标 '+currentImgW+'×'+currentImgH+' · '+(_si.fit?'等比留白':'拉伸')
-+(_si.auto?'（自动判定）':'')+(_si.fit?(' · 缩放 '+Math.round(_si.pct*100)+'%'):' · 铺满')+' · '+_dir;
++(_si.auto?'（自动判定）':'')
++(_si.fit?(' · 缩放 '+Math.round(_si.pct*100)+'%'):(' · 缩放 '+_sx+'%×'+_sy+'%'))
++' · '+_dir;
 await runPipeline(sourceCanvas, currentImgW, currentImgH);
 		$('upload-msg').textContent='已就绪';fileFlag=1}
 /* ================= 上传：单张流程 / 批量流程 ================= */
