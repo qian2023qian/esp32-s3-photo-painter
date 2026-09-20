@@ -72,8 +72,13 @@ h1{font:900 clamp(26px,4.5vw,40px)/1.05 var(--sans);letter-spacing:-.8px;text-tr
 .cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-bottom:18px}
 /* /sim 页的 .cmp 里有 3 个面板（原图 + 两条管线），让原图独占一行并居中；
    /picker 页只有 2 个面板，:has() 不匹配，仍是左右并排 */
-.cmp:has(> .panel:nth-child(3))> .panel:first-child{grid-column:1/-1;text-align:center}
-.cmp> .panel img{margin:0 auto;max-height:440px;object-fit:contain}
+/* 原图独占一行并居中：面板本身也限宽居中，避免整行大空框 */
+.cmp:has(> .panel:nth-child(3))> .panel:first-child{grid-column:1/-1;width:100%;max-width:920px;
+  margin:0 auto;text-align:center}
+/* 面板内的图必须撑满面板宽度（原来只留 max-height，图会按原始小尺寸显示、面板里全是空白）；
+   再配固定高度让左右两个面板等高，object-fit:contain 保证不裁剪 */
+.cmp> .panel img{width:100%;height:clamp(260px,46vh,440px);object-fit:contain;
+  margin:0 auto;background:#f2efe6}
 @media(max-width:900px){.cmp{grid-template-columns:minmax(0,1fr)}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
 
