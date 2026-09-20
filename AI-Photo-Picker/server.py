@@ -1071,7 +1071,9 @@ function processAndRender(img){
     ctx.drawImage(img,0,0,tw,th);
   }
   srcCanvas=c;
-  $('preview-orig').src=c.toDataURL();
+  // 「原图」要显示真正的原图：此前用的是 c（已按目标尺寸重绘、带白底填充的画布），
+  // 于是竖图/方图会被套上一个 800x480 或 480x800 的目标框，看着像多了个白边画框
+  $('preview-orig').src=(img.currentSrc||img.src);
   onAdj();
 }
 function loadImg(url){return new Promise(function(res,rej){var im=new Image();im.onload=function(){res(im)};im.onerror=function(){rej(new Error('fail'))};im.src=url})}
