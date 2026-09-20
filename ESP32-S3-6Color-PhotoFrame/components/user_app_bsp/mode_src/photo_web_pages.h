@@ -475,7 +475,10 @@ function showTab(id){
     b.setAttribute('aria-selected', String(b.dataset.p===id))});
   document.querySelectorAll('main > section').forEach(function(s){
     s.classList.toggle('hidden', s.id!==id)});
-  window.scrollTo({top:0,behavior:'instant'})}
+  window.scrollTo({top:0,behavior:'instant'});
+  /* 切回图片页时，若当前页缩略图已加载完而预加载没在跑，补一次续跑
+     （此前若被 stopThumbs 打断，预加载会一直停着） */
+  if(id==='p-photos'&&!thumbPaused&&!thumbQueue.length)preloadNearby()}
 window.showTab=showTab;
 var _h=location.hash.slice(1);
 if(_h&&document.getElementById(_h)&&document.getElementById(_h).parentElement.tagName==='MAIN')showTab(_h);
@@ -570,26 +573,42 @@ if(imgs.length>0){pageStore[key]=$('photo-list').innerHTML;console.log('Cache sa
 console.log('goPage:',thumbPage,'->',p,'stored:',Object.keys(pageStore));
 thumbPage=p;renderPage()}
 var thumbQueue=[],thumbPage=0,thumbFiles=[],thumbPaused=0,thumbCurr=null;
-var preloadQueue=[],preloadPaused=0;
+var preloadQueue=[],preloadPaused=0,preloadActive=0,preloadKey='',preloadTimer=null;
 function stopThumbs(){
 thumbPaused=1;thumbQueue=[];preloadPaused=1;preloadQueue=[];
+/* 清掉同页幂等的标记，这样下次真正需要时会重新排一遍 */
+preloadActive=0;preloadKey='';
+if(preloadTimer){clearTimeout(preloadTimer);preloadTimer=null}
 if(thumbCurr){thumbCurr.onload=null;thumbCurr.onerror=null;thumbCurr.src='';thumbCurr=null}}
 function loadThumbsSeq(){
 if(thumbPaused)return;
 thumbQueue=Array.from(document.querySelectorAll('#photo-list img[data-src]'));
 loadNextThumb()}
-function preloadNearby(){
-preloadPaused=0;preloadQueue=[];
-var w=pagerWindow(thumbPage,Math.ceil(thumbFiles.length/thumbPageSize)||1);
+/* 预加载“分页窗口”里其它页的缩略图。
+   要点：同一页不重复重排 —— 否则每次缩略图队列变空都会重置队列，
+   一直在最前面几页打转，后面的页永远排不到（曾表现为“只加载两三页就停”）。 */
+function preloadNearby(force){
+var total=Math.ceil(thumbFiles.length/thumbPageSize)||1;
+var key=thumbPage+'_'+thumbFiles.length;
+if(!force&&key===preloadKey&&(preloadActive||preloadQueue.length))return;
+preloadKey=key;preloadActive=1;preloadPaused=0;preloadQueue=[];
+var w=pagerWindow(thumbPage,total);
 for(var p=w.s;p<w.e;p++){if(p===thumbPage)continue;
 for(var i=p*thumbPageSize;i<Math.min((p+1)*thumbPageSize,thumbFiles.length);i++){
 preloadQueue.push(thumbFiles[i])}}
 loadNextPreload()}
 function loadNextPreload(){
-if(preloadPaused||!preloadQueue.length)return;
+if(preloadPaused||!preloadQueue.length){preloadActive=0;return}
 var img=new Image();var f=preloadQueue.shift();
-img.onload=function(){img.onload=null;loadNextPreload()};
-img.onerror=function(){loadNextPreload()};
+var fired=0;
+var done=function(){if(fired)return;fired=1;
+if(preloadTimer){clearTimeout(preloadTimer);preloadTimer=null}
+img.onload=null;img.onerror=null;loadNextPreload()};
+img.onload=done;
+img.onerror=done;
+/* ESP32 是单线程 HTTP，偶发请求会长时间不回应；没有这个兜底，
+   一张图卡住就会让整条预加载链停在那里不再继续 */
+preloadTimer=setTimeout(done,8000);
 img.src='/api/photo?name='+encodeURIComponent(f)+'&thumb=1'}
 function loadNextThumb(){
 if(!thumbQueue.length||thumbPaused){thumbCurr=null;preloadNearby();return}
