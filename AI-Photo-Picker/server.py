@@ -1300,9 +1300,11 @@ def lib_asset(name: str):
     p = WEBUI_DIR / "lib" / Path(name).name
     if not p.exists() or not p.is_file():
         abort(404)
-    mt = ("application/javascript" if p.suffix == ".js"
-          else "text/css" if p.suffix == ".css"
-          else "application/octet-stream")
+    # 样式还在持续迭代，.css 不设长缓存（否则改完要等 1 小时或强刷才生效）；
+    # 前端 bundle(.js) 不常改，保留缓存
+    if p.suffix == ".css":
+        return send_file(p, mimetype="text/css", max_age=0)
+    mt = "application/javascript" if p.suffix == ".js" else "application/octet-stream"
     return send_file(p, mimetype=mt, max_age=3600)
 
 
