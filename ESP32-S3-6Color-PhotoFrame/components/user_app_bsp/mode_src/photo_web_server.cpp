@@ -38,6 +38,8 @@ extern int      photo_play_mode;    // 0=顺序 1=倒序 2=随机
 extern "C" void photo_persist_settings(void);
 extern "C" void photo_rescan_current_dir(void);
 extern "C" void photo_set_dir(const char *dir);
+extern "C" int  photo_next_switch_in(void);           /* 秒；-1 = 当前不会自动切图 */
+extern "C" const char *photo_next_switch_state(void); /* ok/paused/sleep/lowbat/empty */
 extern "C" void photo_set_play_mode(int mode);
 extern "C" bool photo_get_sensor(float *temp, float *rh);
 
@@ -97,6 +99,8 @@ static esp_err_t api_get_status(httpd_req_t *req)
     cJSON_AddStringToObject(root, "sleep_end", sleep_end);
     cJSON_AddStringToObject(root, "dir", photo_dir);          // 当前播放目录（空=根目录）
     cJSON_AddNumberToObject(root, "mode", photo_play_mode);   // 0=顺序 1=倒序 2=随机
+    cJSON_AddNumberToObject(root, "next_switch_in", photo_next_switch_in());         // 距下次自动切图的秒数；-1=不会自动切
+    cJSON_AddStringToObject(root, "next_switch_state", photo_next_switch_state());   // 原因：ok/paused/sleep/lowbat/empty
     // 电量信息
     PmicRegisterConfig pmic = Custom_PmicGetBatteryInfo();
     int pct = Custom_PmicGetBatteryPercent();

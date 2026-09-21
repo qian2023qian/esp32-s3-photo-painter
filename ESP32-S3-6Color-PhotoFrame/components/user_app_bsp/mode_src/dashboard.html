@@ -67,6 +67,7 @@ h2.sec:first-child{margin-top:0}
   display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums}
 /* 只作用于单位(.u)：数字是 <span id=...> 包着的，旧的 .tile .v span 会把数字一起缩小 */
 .tile .v .u{font:700 13px var(--sans)}
+.next-sub{font:800 11px/1 var(--mono);color:var(--ink2);margin-top:6px;letter-spacing:.6px}
 .tile.hi{background:var(--y)}
 .tile.hi2{background:var(--g);color:#04231a}
 @media(min-width:641px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
@@ -291,6 +292,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
       <div class="tile hi2"><div class="l" style="color:#04321f">&#36816;&#34892;&#29366;&#24577;</div><div class="v" style="font-size:20px"><span id="img-running">--</span></div></div>
       <div class="tile"><div class="l">&#30005;&#27744;&#30005;&#21387;</div><div class="v"><span id="batt-volt">--</span><span class="u">V</span></div></div>
       <div class="tile"><div class="l">&#20805;&#30005;&#29366;&#24577;</div><div class="v" style="font-size:20px"><span id="batt-chg">--</span></div></div>
+      <div class="tile hi"><div class="l">&#19979;&#27425;&#21047;&#26032;</div><div class="v" style="font-size:24px"><span id="next-refresh">--</span></div><div class="next-sub" id="next-refresh-sub"></div></div>
     </div>
 
     <div class="btnrow" style="margin-top:26px">
@@ -517,6 +519,7 @@ bt.className='wifi-tag '+(d.low_battery?'batt-low':'wifi-on');
 $('batt-volt').textContent=d.battery_voltage.toFixed(2);
 $('batt-chg').textContent=d.charging?'充电中':(chgMap[d.charge_status]||'--');
 $('img-count').textContent=d.img_count;$('img-index').textContent=d.img_index;updateNowPhoto();
+if(typeof d.next_switch_in==='number'){nextIn=d.next_switch_in;nextState=d.next_switch_state||'';nextAt=Date.now()+nextIn*1000}renderNext();
 $('img-interval').textContent=minutesToHM(d.interval);$('img-running').textContent=d.running?'运行中':'已暂停';
 $('s-temp').textContent=d.temperature.toFixed(1);$('s-rh').textContent=d.humidity.toFixed(1);
 /* WiFi 配网面板只在首次拿到状态时自动开合一次；
@@ -855,6 +858,21 @@ _nowName=f;
 var nm=$('now-name');if(nm)nm.textContent=f;
 el.src='/api/photo?name='+encodeURIComponent(f)+'&thumb=1'}
 window.updateNowPhoto=updateNowPhoto;
+
+/* 「下次刷新」倒计时：/api/status 每 5s 给一次剩余秒数，这里按本地时钟每秒递减，
+   同时把到点的钟点显示在小字里（设备没有可靠时钟，所以用浏览器的时间算） */
+var nextIn=-1,nextAt=0,nextState='';
+function renderNext(){
+var el=$('next-refresh');if(!el)return;
+var sub=$('next-refresh-sub');
+if(nextIn<0){var txt={paused:'已暂停',sleep:'休眠中',lowbat:'低电量',empty:'无图片'}[nextState]||'--';
+el.textContent=txt;if(sub)sub.textContent='';return}
+var left=Math.max(0,Math.round((nextAt-Date.now())/1000));
+var m=Math.floor(left/60),s=left%60;
+el.textContent=m+':'+String(s).padStart(2,'0');
+if(sub){var t=new Date(nextAt);
+sub.textContent='约 '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')}}
+setInterval(renderNext,1000);
 function updateUploadTarget(){let t=$('upload-target');let s=$('set-dir');if(t)t.textContent=dirLabel(s?s.value:'')}
 
 /* 上传文件名：管线_抖动_br_ct_st_sh_df_时间戳[_批内序号]。
