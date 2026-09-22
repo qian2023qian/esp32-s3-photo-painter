@@ -387,6 +387,14 @@ def ensure_table(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 # 生成一句话文案
+def _thinking_off(api_url: str) -> dict:
+    """DeepSeek V4 系列默认开启思考模式，会带来两个问题：
+    1) 思维链先消耗 max_tokens —— 打分请求只给 64，实测会被吃完、content 返回空字符串；
+    2) 思考模式下 temperature 不生效，而打分需要它。
+    因此仅对 DeepSeek 渠道关闭思考模式，其它渠道原样返回。"""
+    return {"thinking": {"type": "disabled"}} if "deepseek" in (api_url or "").lower() else {}
+
+
 def generate_side_caption(image_path: Path) -> str | None:
     system_prompt = (
         "你是一位为「电子相框」撰写旁白短句的中文文案助手。\n"
@@ -440,6 +448,7 @@ def generate_side_caption(image_path: Path) -> str | None:
             "max_tokens": 64,
             "top_p": 0.9,
             "stream": False,
+            **_thinking_off(ch.get("api_url", "")),
         }
         return ch["api_url"], headers, body
 
@@ -1059,6 +1068,7 @@ def call_vlm(image_path: Path) -> dict:
             ],
             "temperature": 0.2,
             "stream": False,
+            **_thinking_off(ch.get("api_url", "")),
         }
         return ch["api_url"], headers, body
 
