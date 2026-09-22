@@ -1,0 +1,211 @@
+/* ==========================================================================
+   AI-Photo-Picker · WebUI v3「新粗野主义」共享样式
+   用途：/review · /picker · /sim · /settings 四个页面共用。
+   设计意图：只覆盖既有 class 名，页面标记与 JS 一律不动，
+   因此顶部六色胶带用 body::before 绘制、区块装饰用 box-shadow 完成。
+   ========================================================================== */
+:root{
+  --paper:#fdfbf5; --ink:#0a0a0a; --ink2:#5b5b5b; --y:#ffd400; --r:#ff4438;
+  --b:#2f6bff; --g:#19c37d; --bd:3px; --sh:6px 6px 0 var(--ink); --sh-sm:4px 4px 0 var(--ink);
+  --sans:"Segoe UI",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  font:16px/1.55 var(--sans);color:var(--ink);background:var(--paper);
+  background-image:linear-gradient(rgba(10,10,10,.045) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(10,10,10,.045) 1px,transparent 1px);
+  background-size:22px 22px;
+  padding:26px 16px 70px;
+}
+/* 顶部六色胶带（v3 的识别特征，无需在页面里加标记） */
+body::before{content:"";position:fixed;left:0;right:0;top:0;height:10px;z-index:99;
+  border-bottom:var(--bd) solid var(--ink);
+  background:repeating-linear-gradient(90deg,var(--ink) 0 26px,#fff 26px 52px,var(--y) 52px 78px,
+    var(--r) 78px 104px,var(--b) 104px 130px,var(--g) 130px 156px)}
+@media(min-width:900px){body{padding:30px 26px 80px}}
+img{max-width:100%}
+a{color:inherit}
+
+h1{font:900 clamp(26px,4.5vw,40px)/1.05 var(--sans);letter-spacing:-.8px;text-transform:uppercase}
+.sub{font:700 13.5px/1.6 var(--sans);color:var(--ink2);margin:8px 0 16px;max-width:88ch}
+.subtitle{display:inline-block;font:900 13px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
+  background:var(--ink);color:#fff;padding:8px 12px;margin:22px 0 12px}
+.status{font:700 13px var(--mono);color:var(--ink2)}
+.container{max-width:1600px;margin:0 auto}
+
+/* ---------- 页签栏 ---------- */
+/* 导航三档，与固件 WebUI 一致：<641 底部页签 / 641~1399 顶栏 / >=1400 左侧栏 */
+.nav{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 20px}
+.nav a{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;background:#fff;
+  border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);text-decoration:none;
+  font:800 14px var(--sans);letter-spacing:.4px;white-space:nowrap}
+.nav a:hover{background:var(--y)}
+.nav a.on{background:var(--y)}
+@media(max-width:640px){
+  .nav{position:fixed;left:0;right:0;bottom:0;z-index:40;margin:0;padding:8px;
+    background:#fff;border-top:var(--bd) solid var(--ink);
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px}
+  .nav a{justify-content:center;min-height:48px;padding:0 6px;font-size:12px;box-shadow:none}
+  body{padding-bottom:120px}
+}
+@media(min-width:1400px){
+  /* 体侧栏 + 内容列：不动标记，直接把 body 变成网格，非 nav 的子元素一律进第 2 列 */
+  body{display:grid;grid-template-columns:250px minmax(0,1fr);gap:0;align-content:start;
+    padding:0 0 0 0}
+  .nav{grid-column:1;grid-row:1/span 200;position:sticky;top:0;align-self:start;height:100vh;
+    flex-direction:column;flex-wrap:nowrap;gap:10px;margin:0;padding:22px 16px 18px;
+    background:#fff;border-right:var(--bd) solid var(--ink);overflow:auto}
+  .nav a{width:100%;justify-content:flex-start}
+  .nav::before{content:"INKTIME";display:block;font:900 19px/1 var(--sans);letter-spacing:-.4px;
+    text-transform:uppercase;padding:0 4px 16px;margin-bottom:8px;border-bottom:var(--bd) solid var(--ink)}
+  body>*:not(.nav){grid-column:2;min-width:0;margin-left:26px;margin-right:26px}
+  body>h1:first-of-type{margin-top:26px}
+}
+
+/* ---------- 通用块 ---------- */
+.panel,.sliders,.bar,.controls,.save-row,.info-bar,.actions{
+  background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh);padding:14px;min-width:0}
+.panel h2{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  font:900 14px var(--sans);letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-bottom:18px}
+/* /sim 页的 .cmp 里有 3 个面板（原图 + 两条管线），让原图独占一行并居中；
+   /picker 页只有 2 个面板，:has() 不匹配，仍是左右并排 */
+/* 原图独占一行并居中：面板本身也限宽居中，避免整行大空框 */
+.cmp:has(> .panel:nth-child(3))> .panel:first-child{grid-column:1/-1;width:100%;max-width:920px;
+  margin:0 auto;text-align:center}
+/* 面板内的图必须撑满面板宽度（原来只留 max-height，图会按原始小尺寸显示、面板里全是空白）；
+   再配固定高度让左右两个面板等高，object-fit:contain 保证不裁剪 */
+.cmp> .panel img{width:100%;height:clamp(260px,46vh,440px);object-fit:contain;
+  margin:0 auto;background:#f2efe6}
+@media(max-width:900px){.cmp{grid-template-columns:minmax(0,1fr)}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+
+/* ---------- 标签 / 按钮 ---------- */
+.tag{font:800 11px/1 var(--sans);letter-spacing:.6px;text-transform:uppercase;padding:5px 8px;
+  border:2px solid var(--ink);background:#fff;white-space:nowrap}
+.tag-e{background:var(--b);color:#fff}
+.tag-o{background:var(--r);color:#fff}
+.tag-n{background:var(--ink);color:#fff}
+
+/* 所有裸 button 一律 v3 风格：此前只覆盖了 fieldset 内的，
+   页面底部的「保存配置」等仍是浏览器默认样式 */
+button,.btn-send,.btn-save,.bar button,.actions button,.pager a{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:0 16px;
+  background:#fff;color:var(--ink);border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);cursor:pointer;
+  font:800 14px var(--sans);letter-spacing:.3px;text-decoration:none;
+  transition:transform .06s,box-shadow .06s}
+button:hover,.btn-send:hover,.btn-save:hover,.bar button:hover,.actions button:hover,.pager a:hover{background:var(--y)}
+button:active,.btn-send:active,.btn-save:active,.bar button:active,.actions button:active,.pager a:active{
+  transform:translate(4px,4px);box-shadow:0 0 0 var(--ink)}
+.btn-send{width:100%;margin-top:12px}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.actions button.sec{background:var(--b);color:#fff}
+.actions button.orange{background:var(--y)}
+.actions button.red{background:var(--r);color:#fff}
+.actions button.sec:hover{background:var(--b)}
+.actions button.orange:hover{background:var(--y)}
+.actions button.red:hover{background:var(--r)}
+
+/* ---------- 表单控件 ---------- */
+input[type=text],input[type=password],input[type=number],input:not([type]),select{
+  min-width:0;height:42px;padding:0 11px;background:#fff;color:var(--ink);
+  border:2px solid var(--ink);outline:none;font:700 13px var(--sans);appearance:none}
+input:focus,select:focus{background:#fffbe6;box-shadow:var(--sh-sm)}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 18px,calc(100% - 11px) 18px;background-size:6px 6px,6px 6px;
+  background-repeat:no-repeat;padding-right:32px}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1 1 90px;min-width:0;height:28px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:#fff;border:2px solid var(--ink)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:22px;background:var(--ink);
+  margin-top:-9px;border:2px solid var(--ink)}
+.sliders{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 20px;margin-bottom:18px}
+.slider-item{display:flex;align-items:center;gap:10px;min-width:0;font:700 12px var(--sans)}
+.slider-item .key,.skey,.ch-f>span{font:800 12px/1.4 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--ink2);min-width:48px;flex:0 0 auto}
+.slider-item .val{font:800 13px var(--mono);min-width:38px;text-align:right}
+
+/* ---------- 顶部工具条 / 上传区 ---------- */
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.bar>span{font:800 11px var(--sans);letter-spacing:1.2px;text-transform:uppercase;color:var(--ink2);white-space:nowrap}
+.bar input{flex:0 1 240px}
+.ch-f input{flex:1 1 220px}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.upload-zone{border:var(--bd) dashed var(--ink);background:#fffbe6;padding:24px 16px;text-align:center;
+  cursor:pointer;font:800 14px var(--sans);margin-bottom:18px}
+.upload-zone:hover{background:var(--y)}
+.info-bar{font:700 13.5px var(--sans);color:var(--ink2);margin-bottom:18px}
+.save-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+
+/* ---------- 消息 ---------- */
+.msg{font:700 13px var(--sans);margin-top:8px}
+.ok{color:#0f7a45}
+.err{color:var(--r)}
+
+/* ---------- 照片库卡片 ---------- */
+.item{background:#fff;border:var(--bd) solid var(--ink);box-shadow:var(--sh-sm);min-width:0;
+  display:flex;flex-direction:column;transition:transform .08s,box-shadow .08s}
+.item:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 var(--ink)}
+.img-wrap{border-bottom:2px solid var(--ink);background:#f2efe6}
+.img-link{display:block}
+.img-wrap img{width:100%;aspect-ratio:4/3;object-fit:contain;display:block}
+.side-under{padding:7px 10px;font:800 12px var(--sans);background:var(--y);border-bottom:2px solid var(--ink)}
+.meta{display:flex;flex-direction:column;gap:5px;padding:9px 10px;min-width:0}
+.path{font:700 12px var(--mono);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.type{font:800 12px var(--sans)}
+.score{align-self:flex-start;font:800 12px var(--mono);background:var(--g);color:#04231a;
+  border:2px solid var(--ink);padding:3px 6px}
+.reason{font:700 13px var(--sans);color:var(--ink)}
+.exif,.extra{font:700 12px var(--mono);color:var(--ink2)}
+.caption{font:700 13px var(--sans);color:var(--ink)}
+
+/* ---------- 评分条（/sim） ---------- */
+.srow{display:flex;align-items:center;gap:10px;margin:6px 0;min-width:0}
+/* 限宽：原来 flex:1 会拉满整行，一条 72 分的条能有上千像素长，很难看出差距 */
+.sbar{flex:0 1 320px;height:16px;min-width:80px;background:#fff;border:2px solid var(--ink);overflow:hidden}
+.sbar-fill{height:100%;background:var(--b);transition:width .25s}
+/* 五个评分维度各给一个 v3 色（原来是渐变色，改成平色更贴粗野风） */
+.sbar-fill.mem{background:var(--b)}
+.sbar-fill.bea{background:var(--g)}
+.sbar-fill.fun{background:var(--y)}
+.sbar-fill.dep{background:var(--ink)}
+.sbar-fill.art{background:var(--r)}
+.sval,.sval2{font:700 13px var(--mono);color:var(--ink2)}
+.sval2{flex:1 1 auto;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+/* 原来 nowrap+省略号会把「描述」「理由」截断，信息展示不全 */
+.srow.wrap{align-items:flex-start}
+.srow.wrap .skey{padding-top:2px}
+
+/* ---------- 设置页字段 ---------- */
+.ch-f{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ch-f input{flex:1 1 220px}
+
+/* ---------- 分页 ---------- */
+.pager{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+
+/* ---------- /files 输出目录浏览（结构极简，只有 ul/code） ---------- */
+ul{margin:10px 0 0 20px;line-height:1.9}
+code{background:#fff;border:2px solid var(--ink);padding:2px 6px;font:700 12px var(--mono)}
+
+/* ---------- 设置页：<fieldset><legend> 分区 + <label><span>名</span><input> 字段 ---------- */
+/* 字段在分区内多列排布：否则每个输入框都会拉成整行宽，右侧只剩一排空长条 */
+fieldset{border:var(--bd) solid var(--ink);background:#fff;box-shadow:var(--sh-sm);
+  padding:18px;margin:0 0 18px;min-width:0;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
+  gap:2px 26px;align-items:start}
+legend{grid-column:1/-1;justify-self:start;
+  font:900 13px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;
+  background:var(--ink);color:#fff;padding:7px 11px;margin-bottom:10px}
+/* 分区里的整行内容（渠道行、说明段落、说明容器）横跨所有列 */
+fieldset>div,fieldset>p,fieldset>.ch-row,fieldset>table,fieldset>pre{grid-column:1/-1}
+label{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin-bottom:12px;min-width:0}
+label>span{font:800 12px/1.4 var(--sans);letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--ink2);min-width:92px;flex:0 0 auto}
+label>input,label>select{flex:1 1 120px;min-width:0}
+input[type=checkbox]{width:20px;height:20px;margin:0;flex:0 0 auto;accent-color:var(--ink)}
+
+/* ---------- fieldset / 渠道行里的裸按钮 ---------- */
+fieldset button,.ch-row button{min-height:38px;padding:0 14px;font-size:12px;box-shadow:3px 3px 0 var(--ink)}
+.ch-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ch-row input{flex:1 1 200px;min-width:0}

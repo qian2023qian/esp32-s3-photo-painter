@@ -387,6 +387,14 @@ def ensure_table(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 # 生成一句话文案
+def _thinking_off(api_url: str) -> dict:
+    """DeepSeek V4 系列默认开启思考模式，会带来两个问题：
+    1) 思维链先消耗 max_tokens —— 打分请求只给 64，实测会被吃完、content 返回空字符串；
+    2) 思考模式下 temperature 不生效，而打分需要它。
+    因此仅对 DeepSeek 渠道关闭思考模式，其它渠道原样返回。"""
+    return {"thinking": {"type": "disabled"}} if "deepseek" in (api_url or "").lower() else {}
+
+
 def generate_side_caption(image_path: Path) -> str | None:
     system_prompt = (
         "你是一位为「电子相框」撰写旁白短句的中文文案助手。\n"
@@ -440,6 +448,7 @@ def generate_side_caption(image_path: Path) -> str | None:
             "max_tokens": 64,
             "top_p": 0.9,
             "stream": False,
+            **_thinking_off(ch.get("api_url", "")),
         }
         return ch["api_url"], headers, body
 
@@ -503,11 +512,30 @@ def filter_unscored(conn: sqlite3.Connection, paths: list[Path]) -> list[Path]:
 
 
 def _convert_gps_to_deg(value):
+    """(度, 分, 秒) -> 十进制度。
+
+    兼容两种来源：exiftool 给的是 (分子, 分母) 分数对；Pillow 给的是 IFDRational
+    （可以直接 float()，但没有 [0]/[1]）—— 旧实现只认前者，于是 Pillow 读取的 GPS
+    一律抛异常返回 None，GPS/城市功能实际从未生效过。
+    """
     try:
         d, m, s = value
-        return float(d[0]) / float(d[1]) + float(m[0]) / float(m[1]) / 60.0 + float(s[0]) / float(s[1]) / 3600.0
     except Exception:
         return None
+
+    def _f(x):
+        try:
+            return float(x)                        # IFDRational / int / float
+        except Exception:
+            try:
+                return float(x[0]) / float(x[1])   # (分子, 分母)
+            except Exception:
+                return None
+
+    dv, mv, sv = _f(d), _f(m), _f(s)
+    if dv is None or mv is None or sv is None:
+        return None
+    return dv + mv / 60.0 + sv / 3600.0
 
 
 def read_gps_with_exiftool(path: Path):
@@ -634,6 +662,28 @@ def read_exif(path: Path) -> dict:
                     lon = -lon
     except Exception:
         pass
+
+    # 方式 3：Pillow 现代接口直接读 GPS 子 IFD。
+    # 说明：本函数早先用 _getexif()/exif.get("GPSInfo") 取 GPS，实测在 vivo 等手机照片上
+    # 拿不到（GPS 在独立的 0x8825 子 IFD 里），导致 exif_gps_lat/lon 全是 null、城市解析永远为空。
+    if lat is None or lon is None:
+        try:
+            from PIL import Image as _Image
+            with _Image.open(path) as _im:
+                _gps = _im.getexif().get_ifd(0x8825)
+            if _gps:
+                _t = {ExifTags.GPSTAGS.get(k, k): v for k, v in _gps.items()}
+                _lv, _ln = _t.get("GPSLatitude"), _t.get("GPSLongitude")
+                if _lv is not None:
+                    lat = _convert_gps_to_deg(_lv)
+                    if lat is not None and str(_t.get("GPSLatitudeRef", "N")).upper().startswith("S"):
+                        lat = -lat
+                if _ln is not None:
+                    lon = _convert_gps_to_deg(_ln)
+                    if lon is not None and str(_t.get("GPSLongitudeRef", "E")).upper().startswith("W"):
+                        lon = -lon
+        except Exception:
+            pass
 
     # 方式 2：降级到旧的 GPSInfo dict（某些 JPEG 可能走这条路径）
     if lat is None or lon is None:
@@ -996,14 +1046,28 @@ def call_vlm(image_path: Path) -> dict:
         "如果画面中含有：孩子/猫咪/宠物题材，这些主题更容易产生高回忆价值，请直接以75分为中心，并大幅提高评分”。\n"
 
         "【明显低价值图片的处理】\n"
-        "对以下低价值图片，必须将 memory_score 压低到 0~25（最多不超过 39）。\n"
-        "- 裸露、低俗、色情或违反公序良俗的图片。\n\n"
-        "- 账单、收据、广告、随手拍的杂物、测试图片、屏幕截图等。\n\n"
-        
-        "【评分适用规则】\n"
-        "- 真实生活照片（人物/孩子/家庭/旅行/风景/美食/宠物/日常/文档/杂物等）：评 memory_score 和 beauty_score。\n"
-        "- 网络图/非真实照片（表情包/梗图/二次元插画）：不评 memory_score 和 beauty_score（输出 null），改为评类型专属评分。\n"
-        "- 混合类型按画面主体判断：主体是表情包/梗图/插画则按网络图处理。\n\n"
+        "对以下低价值图片，必须将 memory_score 压低到 0~25（最多不超过 39）：\n"
+        "- 裸露、低俗、色情或违反公序良俗的图片。\n"
+        "- 账单、收据、广告、测试图片，以及**纯杂物/废片**（误拍的地板墙面、严重模糊失焦、纯文字截图）。\n"
+        "**注意：「随手拍但记录了生活」的照片不属于低价值** —— 吃饭、买菜、修东西、路边随手一拍、家人日常、\n"
+        "  随手记录的小场景，都是有回忆价值的真实照片，请按下面【值得回忆度评分方法】给 58~82 区间的分数，\n"
+        "  不要因为「随手拍」三个字就压到 0~25。只有画面里没有任何可辨认的生活内容（纯杂物、纯文字、废片）才压到低分。\n"
+        "- 屏幕截图、聊天记录截图、社交媒体/新闻截图、文档翻拍。\n"
+        "注意：以上这些**仍然属于“真实照片”**，memory_score 与 beauty_score 都要给（低分 0~25），不要输出 null。\n\n"
+
+        "【评分适用规则（务必分清这两类）】\n"
+        "- 真实照片：人物/孩子/家庭/旅行/风景/美食/宠物/日常/文档/杂物，**以及所有截图类**\n"
+        "  （屏幕截图、聊天记录、社交平台截图、新闻截图、文档翻拍）。一律评 memory_score 和 beauty_score；\n"
+        "  截图类按低价值处理（memory 0~25、beauty 0~25）。\n"
+        "- 网络图：**仅指**表情包、梗图、二次元插画这三类（从网络下载或绘制的图，不是屏摄、不是截图）。\n"
+        "  不评 memory_score 与 beauty_score（输出 null），改为评类型专属评分。\n"
+        "- **判断优先级（先截图后内容，务必遵守）**：只要这张图是“对着屏幕或纸面拍摄/截屏/翻拍”得到的\n"
+        "  （包括社交平台帖子、评论区、聊天记录、新闻画面、教材/文档翻拍），**无论画面主体是表情包还是梗图**，\n"
+        "  都必须按真实照片处理：给 memory_score 与 beauty_score（0~25），**不要输出 null**；\n"
+        "  同时如果主体确实是表情包/梗图/插画，也照常评 funny/depth/art。两类可以同时给。\n"
+        "  只有“从网络下载或绘制的纯图片”（不是屏摄、不是截屏）才按网络图处理、memory 与 beauty 输出 null。\n"
+        "- type 只能从下列类型名里选：人物/孩子/家庭/旅行/风景/美食/宠物/日常/文档/杂物/屏幕截图/\n"
+        "  表情包/梗图/二次元插画；**不要自创类型名**（例如不要写“网络图”），可用 / 连接多个。\n\n"
 
         "【美观分（beauty_score）评分方法】\n"
         "美观分只评价视觉：构图、光线、清晰度、色彩、主体突出。\n"
@@ -1011,7 +1075,14 @@ def call_vlm(image_path: Path) -> dict:
 
         "【类型专属评分（仅对表情包/梗图/二次元插画评分，其他类型不评/省略该字段；务必拉开差距，避免普遍 70-90）】\n"
         "- funny_score（有趣度 0-100，精确到 1 位小数）：表情包、梗图必评，评价搞笑程度、笑点强度、创意、反转、沙雕感。\n"
-        "    区间：完全不好笑/尬/无梗 0-40；普通表情包能会心一笑 50-65；比较搞笑有笑点 65-78；很好笑有创意或反转 78-90；神级好笑（极少数）90+。多数应落 50-78。\n"
+        "    区间：完全不好笑/尬/无梗 0-40；普通表情包能会心一笑 50-65；比较搞笑有笑点 65-78；很好笑有创意或反转 78-90；神级好笑（极少数）90+。\n"
+        "    **锚点示例（按此标定，不要总给 70~85）**：\n"
+        "      普通熊猫头/吃瓜表情，无反转           → 55~62\n"
+        "      有一定创意或明确笑点的表情包            → 65~72\n"
+        "      四格漫画、有清晰反转的梗图              → 73~80\n"
+        "      反转意外、结构精巧、越想越好笑          → 80~88\n"
+        "      极罕见的神级梗（整批里可能一张都没有）    → 88 以上\n"
+        "    请对照上面示例决定分数，而不是默认给中间值。\n"
         "- depth_score（深度/立意 0-100，精确到 1 位小数）：梗图必评，评价讽刺、批判、反转、哲理、社会观察、立意深度。\n"
         "    区间：纯搞笑无深意 0-40；略有讽刺或意味 50-65；明显立意/反转/反讽 65-80；深刻发人深省 80+。多数梗图无深度应集中 0-60。\n"
         "- art_score（艺术完成度 0-100，精确到 1 位小数）：二次元插画必评，评价完成度、构图、配色、光影、细节精细度。\n"
@@ -1019,7 +1090,7 @@ def call_vlm(image_path: Path) -> dict:
 
         "请严格只输出 JSON，格式如下：\n"
         "{\n"
-        "  \"caption\": \"……\",\n"
+        "  \"caption\": \"画面描述：客观描述画面内容（含画面里的文字/台词要点），60~150 字；只做描述，不要写成文案、不要抒情，严禁超过 160 字。\",\n"
         "  \"type\": \"人物/家庭/旅行/…… 可以带多个type\",\n"
         "  \"memory_score\": 0.0-100.0（仅真实照片；网络图输出 null）\n"
         "  \"beauty_score\": 0.0-100.0（仅真实照片；网络图输出 null）\n"
@@ -1059,6 +1130,7 @@ def call_vlm(image_path: Path) -> dict:
             ],
             "temperature": 0.2,
             "stream": False,
+            **_thinking_off(ch.get("api_url", "")),
         }
         return ch["api_url"], headers, body
 

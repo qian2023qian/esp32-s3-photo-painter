@@ -125,15 +125,22 @@ python main.py serve [--host 0.0.0.0] [--port 8765]
 
 ### WebUI（`serve`）
 
-启动后本机访问 `http://127.0.0.1:8765/`（主页面为 `/review`），常见页面：
+启动后本机访问 `http://127.0.0.1:8765/` —— 根路径会 **302 跳转到主页面 `/review`**，也可以直接打开下表任意路由：
 
 | 路由 | 说明 |
 |------|------|
+| `/` | 入口，302 → `/review` |
 | `/review` | 照片库浏览：分页、按月份/日期/类型筛选、7 种排序、随机一天 |
 | `/sim`   | 墨水屏渲染 + 调色 + 推送模拟器（两套管线并排对比） |
 | `/picker`| 交互式渲染 + 调色 + 推送页（独立于 `sim` 的简化版） |
 | `/settings` | 编辑配置（相册路径、VLM 渠道、推送开关、调色默认值等） |
 | `/api/analyze`, `/api/render` | 一键触发分析 / 渲染（后台子进程） |
+| `/files/` | 输出目录浏览 |
+
+**外观**：四个页面共用 `webui/lib/v3.css`（新粗野主义：3px 黑边 + 硬投影 + 墨水屏六色），
+由 `/lib/v3.css` 提供。改样式只改这一个文件即可，页面本身只有 class 名依赖它；
+顶部那条六色胶带用 `body::before` 绘制，所以无需在页面里加任何标记。
+
 | `/api/stop` | 停止正在运行的 analyze / render 子进程 |
 | `/api/log/<name>` | 读取 analyze / render 子进程的实时日志 |
 | `/api/settings` | 配置的读取 / 保存 |
@@ -202,6 +209,13 @@ python main.py serve [--host 0.0.0.0] [--port 8765]
 - **异地加分**：照片 GPS 距离 `HOME_LAT/LON` 超过 `HOME_RADIUS_KM` 视为“异地”，回忆分小幅 +5。
 - **Screenshot 过滤**：文件名含 `screenshot` 的图会被 `analyze` / `render` 双双跳过。
 - **网络图不入“回忆/美观”分**：表情包 / 梗图 / 二次元插画不评 `memory_score` / `beauty_score`（输出 `null`），改为评 `funny_score` / `depth_score` / `art_score`。
+- **DeepSeek 渠道必须关思考模式**：DeepSeek V4 系列（`deepseek-flash` / `deepseek-v4-pro`）默认开启
+  思考模式，思维链会**先消耗 `max_tokens`** —— 打分请求只给 64，实测会被吃完、`content` 返回空字符串；
+  且思考模式下 `temperature` 不生效。代码中 `_thinking_off()` 会对 URL 含 `deepseek` 的渠道自动附加
+  `{"thinking":{"type":"disabled"}}`，其它渠道原样不受影响。换渠道后若遇到"调用成功但内容为空"，
+  先查这一条。
+- **DeepSeek 图像输入**：`content` 用标准 OpenAI 块数组（`{"type":"image_url","image_url":{"url":"data:image/jpeg;base64,..."}}`），
+  与本文档现有格式一致，无需改代码。旧模型名 `deepseek-v4-flash-vision-exp` 已下线，统一用 `deepseek-flash`。
 - **VLM 渠道故障切换**：渠道列表有多个时按优先级请求，遇 429 / 解析失败自动切下一个，并对失败渠道做**冷却降级**（`CHANNEL_FAILOVER_COOLDOWN_SEC`）。
 - **NAS 掉盘守护**（macOS）：路径若在 NAS 卷上，读文件失败会尝试用 AppleScript 重挂载并重试（配置 `NAS_MOUNT_URL` / `NAS_MOUNT_POINT`）。
 - **渲染方向**：`render_pipeline` 按“高 > 宽用竖屏 480×800，否则横屏 800×480”自动适配；`render_daily_photo` 固定按竖屏 480×800 构图（照片 + 底部文案区）。

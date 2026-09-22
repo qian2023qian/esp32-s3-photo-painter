@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f5f0">
+<title>相框仪表盘 · 设计稿 v2（纸张 / 印刷，浅色，PC + 移动）</title>
+<style>
+/* ==========================================================================
+   设计稿 v2 —— 视觉语言：「纸张 / 印刷」
+   与旧版的区别：浅色纸质底、衬线标题、发丝分隔线（不用圆角卡片+阴影）、
+   墨水屏 6 色作为印刷色标、编号与数据用编辑式排版。
+   结构：PC 左侧栏 / 平板顶栏 / 手机底部页签 —— 同一套标记，靠媒体查询切换。
+   约束：无 CDN、无外链资源（配网热点无外网）。
+   ========================================================================== */
+:root{
+  --paper:#f7f5f0; --paper2:#efece4; --card:#fffefb;
+  --ink:#191917; --ink2:#5f5a53; --ink3:#8d867c;
+  --rule:#e2dcd1; --rule2:#cfc7b8;
+  --k:#1f2226; --w:#e8eef0; --y:#cfc92c; --r:#b23a2e; --b:#3a5fbf; --g:#4a7a5a;
+  --serif:Georgia,"Songti SC","Noto Serif SC","Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --maxw:1400px; --gap:20px;
+  --navh:56px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{
+  font:15px/1.6 var(--sans);color:var(--ink);background:var(--paper);
+  /* 极淡的纸纹，避免大面积纯色的塑料感 */
+  background-image:
+    repeating-linear-gradient(0deg,rgba(120,110,95,.022) 0 1px,transparent 1px 3px),
+    radial-gradient(1200px 600px at 12% -10%,rgba(255,255,255,.9),transparent 60%);
+  padding-bottom:calc(var(--navh) + env(safe-area-inset-bottom,0px));   /* 手机底部页签占位 */
+}
+img{max-width:100%;display:block}
+button,input,select{font:inherit;color:inherit}
+
+/* ---------- 印刷色标（本设计的识别元素） ---------- */
+.cbar{display:flex;gap:2px;flex:0 0 auto}
+.cbar i{width:8px;height:14px;display:block}
+.cbar i:nth-child(1){background:var(--k)}.cbar i:nth-child(2){background:#fff;box-shadow:inset 0 0 0 1px var(--rule2)}
+.cbar i:nth-child(3){background:var(--y)}.cbar i:nth-child(4){background:var(--r)}
+.cbar i:nth-child(5){background:var(--b)}.cbar i:nth-child(6){background:var(--g)}
+
+/* ==========================================================================
+   导航：手机=底部页签 / 平板=顶栏 / PC=左侧栏（同一套标记）
+   ========================================================================== */
+.nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;background:rgba(247,245,240,.96);
+  backdrop-filter:blur(10px);border-top:1px solid var(--rule);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.nav .brand,.nav .foot{display:none}
+.tabs{display:flex;width:100%;max-width:var(--maxw);margin:0 auto}
+.tabs button{
+  flex:1;min-width:0;border:0;background:transparent;cursor:pointer;padding:9px 2px 8px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  font-size:10.5px;letter-spacing:.3px;color:var(--ink3);border-top:2px solid transparent;margin-top:-1px;
+}
+.tabs button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.tabs button[aria-selected="true"]{color:var(--ink);border-top-color:var(--ink)}
+.tabs .badge{position:absolute;transform:translate(15px,-2px);min-width:15px;height:15px;border-radius:99px;
+  background:var(--r);color:#fff;font:600 9.5px/15px var(--sans);padding:0 4px;text-align:center}
+.tabs button{position:relative}
+
+/* 平板及以上：顶栏 */
+@media(min-width:641px){
+  body{padding-bottom:0;padding-top:0}
+  .nav{position:sticky;top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--rule);
+    display:flex;align-items:center;gap:16px;padding:0 20px;height:var(--navh)}
+  .nav .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .nav .brand b{font:600 16px/1.2 var(--serif);letter-spacing:.2px;white-space:nowrap}
+  .nav .brand small{display:block;font:400 10.5px/1.3 var(--sans);color:var(--ink3)}
+  .tabs{width:auto;margin:0 0 0 auto;gap:2px;flex:0 1 auto}
+  .tabs button{flex:0 0 auto;flex-direction:row;gap:7px;padding:8px 13px;font-size:13.5px;
+    border-top:0;border-bottom:2px solid transparent;margin-top:0;border-radius:2px}
+  .tabs button[aria-selected="true"]{border-bottom-color:var(--ink);background:var(--paper2)}
+  .tabs .badge{position:static;transform:none;margin-left:-2px}
+}
+/* PC：左侧栏（只在 ≥1400 出现：2560×1600 屏在 200% 缩放下 CSS 视口仅约 1318px，
+   这种宽度再分 236px 给侧栏，内容就只剩 ~976px —— 此时用顶部导航更划算） */
+@media(min-width:1400px){
+  body{display:grid;grid-template-columns:auto minmax(0,1fr);justify-content:center;padding:0}
+  .nav{position:sticky;top:0;height:100vh;flex-direction:column;align-items:stretch;gap:0;
+    border-bottom:0;border-right:1px solid var(--rule);padding:22px 16px;width:236px}
+  .nav .brand{padding:0 6px 18px;border-bottom:1px solid var(--rule)}
+  .nav .brand b{font-size:17px}
+  .tabs{flex-direction:column;margin:16px 0 0;gap:1px}
+  .tabs button{flex:1 1 auto;justify-content:flex-start;padding:11px 12px;font-size:14px;
+    border-bottom:0;border-left:2px solid transparent}
+  .tabs button[aria-selected="true"]{border-bottom:0;border-left-color:var(--ink);background:var(--paper2)}
+  .nav .foot{display:block;margin-top:auto;padding:14px 6px 0;border-top:1px solid var(--rule);
+    font-size:11px;color:var(--ink3);line-height:1.7}
+}
+
+/* ==========================================================================
+   版心
+   ========================================================================== */
+/* width:100% 不可省：main 是 grid 子项，一旦带 auto 外边距就不会被拉伸，
+   而会收缩到内容的 fit-content 宽度（曾因此让内容在宽屏下只有几百 px） */
+main{width:100%;max-width:var(--maxw);margin:0 auto;padding:20px 18px 40px;min-width:0}
+@media(min-width:641px){main{padding:24px 28px 56px}}
+/* 侧栏贴左边（全出血），只有内容在右侧剩余区域里居中、并保持原来的宽度：
+   内容是定宽居中的，不随窗口拉伸，避免按钮等元素被拉得过宽 */
+@media(min-width:1400px){main{padding:30px 40px 64px;max-width:1120px;margin:0 auto}}
+
+/* ---------- 页头：编辑式标题（衬线 + 发丝线） ---------- */
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding-bottom:12px;margin-bottom:22px;border-bottom:1px solid var(--ink)}
+.head h1{font:600 25px/1.15 var(--serif);letter-spacing:.2px}
+.head p{font-size:12.5px;color:var(--ink2);margin-top:5px}
+.head .rt{text-align:right;font-size:11.5px;color:var(--ink3);line-height:1.7;white-space:nowrap}
+@media(min-width:641px){.head h1{font-size:31px}}
+.head .rt b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* 章节标题：小字母间距 + 短线，像印刷品的小标 */
+.sec{display:flex;align-items:center;gap:10px;margin:26px 0 12px;font:600 12px/1 var(--sans);
+  letter-spacing:1.6px;text-transform:uppercase;color:var(--ink2)}
+.sec:after{content:"";flex:1;height:1px;background:var(--rule)}
+.sec:first-child{margin-top:0}
+
+/* ---------- 数据表：用发丝线分隔，而不是一排圆角卡片 ---------- */
+.spec{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--rule);
+  border-left:1px solid var(--rule);background:var(--card)}
+.spec>div{border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:13px 14px;min-width:0}
+.spec .l{font-size:11.5px;color:var(--ink3);letter-spacing:.4px}
+.spec .v{font:600 22px/1.2 var(--serif);margin-top:4px;display:flex;align-items:baseline;gap:3px;
+  font-variant-numeric:tabular-nums}
+.spec .v span{font:400 11.5px var(--sans);color:var(--ink3)}
+@media(min-width:641px){.spec{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.meter{height:4px;background:var(--paper2);margin-top:9px;overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--g)}
+.meter.low>i{background:var(--r)}
+
+/* ---------- 当前显示：大幅作品 + 图注（像展签） ---------- */
+.plate{background:var(--card);border:1px solid var(--rule);padding:14px}
+.plate .frame{border:1px solid var(--rule2);background:#fff;padding:10px}
+.plate .art{aspect-ratio:4/3;display:block;
+  background:
+   repeating-linear-gradient(0deg,rgba(31,34,38,.13) 0 1px,transparent 1px 3px),
+   repeating-linear-gradient(90deg,rgba(31,34,38,.13) 0 1px,transparent 1px 3px),
+   linear-gradient(150deg,#dfe7e9 0%,#c3ced1 40%,#a9b6bb 72%,#cfd8da 100%)}
+.plate .cap{display:flex;gap:12px;align-items:flex-start;padding-top:12px;margin-top:12px;
+  border-top:1px solid var(--rule)}
+.plate .cap .t{flex:1;min-width:0;overflow:hidden}
+.plate .cap b{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plate .cap .meta{font-size:11.5px;color:var(--ink3);margin-top:3px;font-variant-numeric:tabular-nums}
+.plate .no{font:600 12px/1 var(--mono);color:var(--ink2);border:1px solid var(--rule2);padding:5px 8px;white-space:nowrap}
+
+/* ---------- 按钮：方正的印刷味，主按钮用墨色实心 ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:0 16px;
+  border:1px solid var(--ink);background:transparent;border-radius:2px;cursor:pointer;
+  font-size:14px;letter-spacing:.2px;transition:background .12s,color .12s}
+.btn:hover{background:var(--paper2)}
+.btn.solid{background:var(--ink);color:#fff}
+.btn.solid:hover{background:#000}
+.btn.blue{background:var(--b);border-color:var(--b);color:#fff}
+.btn.red{background:transparent;border-color:var(--r);color:var(--r)}
+.btn.red:hover{background:rgba(178,58,46,.08)}
+.btn.sm{min-height:34px;font-size:13px;padding:0 12px}
+.btn.wide{width:100%}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+.btnrow .btn{flex:1 1 auto}
+
+/* ---------- 表单 ---------- */
+label.f{display:block;margin-bottom:14px}
+label.f>span.k{display:block;font-size:11.5px;color:var(--ink3);letter-spacing:.4px;margin-bottom:5px}
+input[type=text],input[type=password],input[type=number],select{
+  width:100%;min-width:0;height:42px;padding:0 11px;background:#fff;color:var(--ink);
+  border:1px solid var(--rule2);border-radius:2px;outline:none;appearance:none}
+input:focus,select:focus{border-color:var(--ink);box-shadow:0 0 0 2px rgba(25,25,23,.08)}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--ink3) 50%),linear-gradient(135deg,var(--ink3) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 18px,calc(100% - 11px) 18px;background-size:5px 5px,5px 5px;
+  background-repeat:no-repeat;padding-right:32px}
+.inlinerow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.inlinerow>*{min-width:0}
+.inlinerow .grow{flex:1 1 180px}
+
+/* 开关：印刷味的小拨杆 */
+.sw{position:relative;width:46px;height:26px;border:1px solid var(--rule2);background:#fff;border-radius:2px;
+  cursor:pointer;flex:0 0 auto}
+.sw:after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink3);transition:.16s}
+.sw[aria-checked="true"]{border-color:var(--ink);background:var(--paper2)}
+.sw[aria-checked="true"]:after{left:22px;background:var(--ink)}
+
+/* 分段：文字 + 下划线（像印刷品的选项标记） */
+.seg{display:flex;border:1px solid var(--rule2);background:#fff;flex-wrap:wrap}
+.seg button{flex:1 1 auto;min-width:0;min-height:40px;border:0;border-right:1px solid var(--rule2);
+  background:transparent;cursor:pointer;font-size:13.5px;color:var(--ink2);padding:0 14px}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+/* 时 / 分 步进器 */
+.time{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:10px;align-items:end}
+.step{display:flex;align-items:center;border:1px solid var(--rule2);background:#fff;min-width:0}
+.step input{flex:1;width:auto;min-width:0;height:44px;border:0;text-align:center;background:transparent;
+  font:600 17px var(--serif);font-variant-numeric:tabular-nums;appearance:textfield}
+.step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.step button{width:40px;height:44px;flex:0 0 auto;border:0;background:transparent;cursor:pointer;font-size:18px;color:var(--ink2)}
+.step button:hover{background:var(--paper2)}
+.time .u{font-size:12px;color:var(--ink3);padding-bottom:13px}
+.hint{font:600 12px/1 var(--mono);color:var(--b)}
+/* 内容变宽后，小控件不该跟着拉长（否则步进器/按钮会变成超宽空盒子）——统一加上限 */
+@media(min-width:641px){
+  .time{grid-template-columns:minmax(0,200px) auto minmax(0,200px) auto;justify-content:start}
+  .seg{max-width:580px}
+  .btn.wide{max-width:420px}
+  label.f>input,label.f>select{max-width:580px}
+}
+
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;min-width:0;height:30px;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--rule2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;background:var(--ink);
+  border-radius:50%;margin-top:-6px}
+.sl{display:grid;grid-template-columns:52px minmax(0,1fr) 38px;gap:10px;align-items:center;margin-bottom:4px}
+.sl .k{font-size:12px;color:var(--ink2)}
+.sl .val{font:12px var(--mono);color:var(--ink3);text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---------- 图片：接触印相样张（contact sheet）
+   注意：这里曾与底部弹层共用 .sheet 类名，导致照片网格被套上 position:fixed
+   （弹层规则）而弹层被套上 display:grid —— 已改名为 .contact ---------- */
+.contact{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;background:var(--rule);
+  border:1px solid var(--rule)}
+.contact .cell{background:var(--card);padding:8px 8px 6px;cursor:pointer;min-width:0}
+.contact .im{aspect-ratio:1;border:1px solid var(--rule2);display:block;
+  background-color:currentColor;
+  background-image:
+   repeating-linear-gradient(0deg,rgba(31,34,38,.12) 0 1px,transparent 1px 3px),
+   repeating-linear-gradient(90deg,rgba(31,34,38,.12) 0 1px,transparent 1px 3px),
+   linear-gradient(150deg,rgba(255,255,255,.55),rgba(0,0,0,.18))}
+.contact .cell:nth-child(6n+1){color:#c3ced1}.contact .cell:nth-child(6n+2){color:#8f9c86}
+.contact .cell:nth-child(6n+3){color:#c9c07a}.contact .cell:nth-child(6n+4){color:#b98d84}
+.contact .cell:nth-child(6n+5){color:#8b9bbd}.contact .cell:nth-child(6n){color:#5f6b62}
+.contact .cell[aria-current="true"]{background:#fff;box-shadow:inset 0 0 0 2px var(--ink)}
+.contact .lb{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:6px;
+  font:11px var(--mono);color:var(--ink3)}
+.contact .lb .on{color:var(--g);font-weight:600}
+@media(min-width:641px){.contact{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(min-width:1024px){.contact{grid-template-columns:repeat(6,minmax(0,1fr))}}
+
+.pager{display:flex;justify-content:center;align-items:center;gap:4px;margin-top:16px}
+.pager a{min-width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--rule2);background:#fff;color:var(--ink2);text-decoration:none;font:13px var(--mono)}
+.pager a[aria-current="page"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pager a.dis{opacity:.4}
+
+/* ---------- 上传 ---------- */
+.drop{border:1px dashed var(--rule2);background:var(--card);padding:26px 16px;text-align:center;cursor:pointer}
+.drop:hover{border-color:var(--ink);background:var(--paper2)}
+.drop .t{font:600 15px var(--serif)}
+.drop .s{font-size:12px;color:var(--ink3);margin-top:4px}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px;background:var(--rule);border:1px solid var(--rule)}
+.cmp figure{background:var(--card);padding:10px;min-width:0}
+.cmp .im{aspect-ratio:4/3;border:1px solid var(--rule2);display:block;
+  background:repeating-linear-gradient(0deg,rgba(31,34,38,.12) 0 1px,transparent 1px 3px),
+   repeating-linear-gradient(90deg,rgba(31,34,38,.12) 0 1px,transparent 1px 3px),linear-gradient(150deg,#dfe7e9,#a9b6bb)}
+.cmp .im.epd{background:repeating-linear-gradient(0deg,rgba(31,34,38,.18) 0 1px,transparent 1px 3px),
+   repeating-linear-gradient(90deg,rgba(31,34,38,.18) 0 1px,transparent 1px 3px),linear-gradient(150deg,#e6dfa4,#8a9a86)}
+.cmp figcaption{margin-top:8px;font-size:11.5px;color:var(--ink3);letter-spacing:.4px}
+details{border:1px solid var(--rule);background:var(--card);margin-top:14px}
+/* 上传面板：与图片列表同页（默认收起，选完图展开）—— 传完就地刷新下方列表并高亮新增项 */
+details.upl{margin:0 0 20px;border-color:var(--ink)}
+details.upl>summary{font:600 16px var(--serif);letter-spacing:.2px}
+details.upl>summary:after{content:"⌃"}
+details.upl[open]>summary:after{content:"⌄"}
+.uplbody{padding:2px 14px 16px}
+.uplbody .sec{margin-top:16px}
+details>summary{padding:13px 14px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;
+  align-items:center;font-size:14px;font-weight:600}
+details>summary::-webkit-details-marker{display:none}
+details>summary:after{content:"+";font:400 18px var(--mono);color:var(--ink3)}
+details[open]>summary:after{content:"−"}
+details>summary+*{border-top:1px solid var(--rule)}
+details .body{padding:14px}
+.prog{height:4px;background:var(--paper2);margin:12px 0}
+.prog>i{display:block;height:100%;width:58%;background:var(--g)}
+.blist{border-top:1px solid var(--rule)}
+.bitem{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--rule);min-width:0}
+.bitem .th{width:34px;height:34px;flex:0 0 auto;border:1px solid var(--rule2);background:
+  repeating-linear-gradient(0deg,rgba(31,34,38,.14) 0 1px,transparent 1px 3px),
+  repeating-linear-gradient(90deg,rgba(31,34,38,.14) 0 1px,transparent 1px 3px),linear-gradient(150deg,#cbd5d7,#96a4aa)}
+.bitem .nm{flex:1;min-width:0;font:12px var(--mono);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{font-size:11px;padding:3px 7px;border:1px solid currentColor;flex:0 0 auto;letter-spacing:.3px}
+.st.ok{color:var(--g)}.st.wait{color:var(--b)}.st.err{color:var(--r)}
+
+/* ---------- PC 两栏 ---------- */
+.cols{display:grid;gap:var(--gap);min-width:0;grid-template-columns:minmax(0,1fr)}
+.cols>*{min-width:0}
+/* 两栏排版只在够宽时才启用：1024~1400 之间若还分两栏，各栏只剩 ~475px，非常挤
+   （1366 笔记本视口约 1318px，减去侧栏后内容仅 1068px —— 正是"太窄"的来源） */
+@media(min-width:1400px){
+  .cols.c2{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start}
+  .cols.c2b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+}
+
+/* ---------- 底部弹层（手机） ---------- */
+.backdrop{position:fixed;inset:0;background:rgba(25,25,23,.42);z-index:50;opacity:0;pointer-events:none;transition:.2s}
+.backdrop.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;background:var(--card);border-top:1px solid var(--ink);
+  padding:16px 18px calc(20px + env(safe-area-inset-bottom,0px));transform:translateY(102%);transition:.24s cubic-bezier(.2,.8,.2,1)}
+.sheet.on{transform:translateY(0)}
+@media(min-width:1024px){
+  .sheet{left:50%;right:auto;bottom:auto;top:50%;width:460px;margin-left:-230px;border:1px solid var(--ink);
+    transform:translateY(-46%) scale(.96);opacity:0;transition:.18s}
+  .sheet.on{transform:translateY(-50%) scale(1);opacity:1}
+}
+.sheet h3{font:600 17px var(--serif);margin-bottom:4px}
+.sheet .mut{font-size:12px;color:var(--ink3)}
+.toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);
+  z-index:60;background:var(--ink);color:#fff;padding:10px 16px;font-size:13.5px;border-radius:2px;
+  opacity:0;pointer-events:none;transition:.2s;max-width:88vw;text-align:center}
+@media(min-width:641px){.toast{bottom:24px}}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:var(--r)}
+
+/* ---------- 设计稿标记 / 自检 ---------- */
+.mockbar{display:flex;align-items:center;gap:8px;padding:9px 12px;margin-bottom:20px;background:#fffdf0;
+  border:1px solid #e6dfa4;font-size:11.5px;color:#6b6417}
+.mockbar:before{content:"";width:7px;height:7px;background:var(--y);flex:0 0 auto}
+#measure{position:fixed;left:0;top:0;right:0;z-index:99;max-height:74vh;overflow:auto;background:#191917;color:#9ff0b4;
+  font:11.5px/1.4 var(--mono);padding:8px 10px;white-space:pre-wrap}
+.hidden{display:none!important}
+/* 设计稿专用：内容宽度切换（正式移植时连同顶部提示条一起删掉）
+   两条生效路径：① radio + :has() 纯 CSS（脚本没跑也能用）；② 脚本写内联 max-width */
+.wdsw{position:fixed;right:14px;bottom:16px;z-index:70;display:none;align-items:center;gap:6px;
+  background:#fff;border:1px solid var(--ink);padding:8px 10px;font:600 11.5px var(--sans);
+  box-shadow:0 2px 10px rgba(0,0,0,.08)}
+@media(min-width:1024px){.wdsw{display:flex}}
+.wdsw .cap{letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3)}
+.wdsw input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.wdsw label{border:1px solid var(--rule2);background:#fff;font:600 11.5px var(--sans);padding:6px 10px;
+  cursor:pointer;color:var(--ink2);user-select:none}
+.wdsw label:hover{background:var(--paper2)}
+.wdsw input:checked+label{background:var(--ink);border-color:var(--ink);color:#fff}
+.wdsw input:focus-visible+label{outline:2px solid var(--acc);outline-offset:1px}
+.wdsw .now{font:600 11.5px var(--mono);color:var(--ink3);min-width:96px;text-align:right}
+body:has(#cw1120:checked) main{max-width:1120px}
+body:has(#cw1400:checked) main{max-width:1400px}
+body:has(#cw1600:checked) main{max-width:1600px}
+body:has(#cw0:checked) main{max-width:none}
+/* 隐藏侧栏：把侧栏那 236px 让给内容（≥1400 才有侧栏，所以断点一致） */
+@media(min-width:1400px){
+  body:has(#cwnonav:checked) .nav{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 导航（手机底部 / 平板顶栏 / PC 侧栏） ============ -->
+<nav class="nav">
+  <div class="brand">
+    <span class="cbar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    <span>
+      <b>PhotoPainter</b>
+      <small>7.3″ Spectra 6 · 800×480</small>
+    </span>
+  </div>
+  <div class="tabs">
+    <button aria-selected="true" data-p="p-status">
+      <svg viewBox="0 0 24 24"><path d="M3 12h3.5l2.5 6.5L13 5l3 7h5"/></svg>状态</button>
+    <button data-p="p-photos">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="1"/><circle cx="8.5" cy="10" r="1.4"/><path d="m4 17 5-4 4 3 3-2.2 4 3.2"/></svg>图片</button>
+    <button data-p="p-play">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M10 9.5v5l4.5-2.5z"/></svg>播放</button>
+    <button data-p="p-settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"/></svg>设置</button>
+  </div>
+  <div class="foot">ESP32-S3 PhotoPainter<br>v2.0.1 · MIT License</div>
+</nav>
+
+<main>
+  <p class="mockbar">设计稿 v2 · 假数据 · 未接入固件（浅色 / 印刷风格 / PC + 移动）</p>
+
+  <!-- ================= 状态 ================= -->
+  <section id="p-status">
+    <div class="head">
+      <div>
+        <h1>状态</h1>
+        <p>设备在线 · 正在轮播「根目录」的 58 张照片</p>
+      </div>
+      <div class="rt">192.168.3.95<br>已运行 <b>06:12:40</b></div>
+    </div>
+
+    <div class="cols c2">
+      <div>
+        <h2 class="sec">正在显示</h2>
+        <div class="plate">
+          <div class="frame"><span class="art"></span></div>
+          <div class="cap">
+            <div class="t">
+              <b>epd_fs_-50_4_4_69_98_1785307822_6.bmp</b>
+              <div class="meta">2019.4.14 · 深圳 · 回忆度 92.5 · 随机</div>
+            </div>
+            <span class="no">006 / 058</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h2 class="sec">设备</h2>
+        <div class="spec">
+          <div><div class="l">电池</div><div class="v">87<span>%</span></div><div class="meter"><i style="width:87%"></i></div></div>
+          <div><div class="l">充电</div><div class="v" style="font-size:17px">未充电</div><div class="meter" style="visibility:hidden"></div></div>
+          <div><div class="l">温度</div><div class="v">24.6<span>℃</span></div></div>
+          <div><div class="l">湿度</div><div class="v">58<span>%</span></div></div>
+          <div><div class="l">图片</div><div class="v">58<span>张</span></div></div>
+          <div><div class="l">播放目录</div><div class="v" style="font-size:17px">根目录</div></div>
+          <div><div class="l">轮播间隔</div><div class="v" style="font-size:17px">01:30</div></div>
+          <div><div class="l">自动轮播</div><div class="v" style="font-size:17px;color:var(--g)">运行中</div></div>
+        </div>
+        <h2 class="sec">快捷操作</h2>
+        <div class="btnrow">
+          <button class="btn">下一张</button>
+          <button class="btn">随机一天</button>
+          <button class="btn solid">上传照片</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 图片 ================= -->
+  <section id="p-photos" class="hidden">
+    <div class="head">
+      <div><h1>图片</h1><p>接触印相样张 · 点选查看、上屏或删除</p></div>
+      <div class="rt">第 <b>2</b> / 6 页<br>共 <b>58</b> 张</div>
+    </div>
+
+    <!-- 上传（与图片列表合并：传完就地刷新列表并高亮新增项） -->
+    <details class="upl" open>
+      <summary>上传新照片</summary>
+      <div class="uplbody">
+      <div class="rt">上传到<br><b>根目录</b></div>
+    </div>
+
+    <div class="cols c2">
+      <div>
+        <div class="drop">
+          <div class="t">点击选择图片</div>
+          <div class="s">JPG / PNG / BMP · 支持一次多选；批量上传只落盘、不刷屏</div>
+        </div>
+        <h2 class="sec">效果预览</h2>
+        <div class="cmp">
+          <figure><span class="im"></span><figcaption>原图</figcaption></figure>
+          <figure><span class="im epd"></span><figcaption>墨水屏效果</figcaption></figure>
+        </div>
+        <details open>
+          <summary>图像调节</summary>
+          <div class="body">
+            <label class="f"><span class="k">管线</span>
+              <div class="seg"><button aria-pressed="true">epdoptimize</button><button>OpenDisplay</button></div>
+            </label>
+            <label class="f"><span class="k">抖动矩阵</span>
+              <select><option>Floyd-Steinberg</option><option>Atkinson</option><option>Jarvis-Judice-Ninke</option><option>Stucki</option><option>Burkes</option><option>Sierra-3</option><option>Sierra-2</option></select>
+            </label>
+            <div class="sl"><span class="k">亮度</span><input type="range" min="-50" max="50" value="0"><span class="val">0</span></div>
+            <div class="sl"><span class="k">对比度</span><input type="range" min="-50" max="50" value="20"><span class="val">+20</span></div>
+            <div class="sl"><span class="k">饱和度</span><input type="range" min="-50" max="50" value="20"><span class="val">+20</span></div>
+            <div class="sl"><span class="k">锐化</span><input type="range" min="0" max="100" value="50"><span class="val">50</span></div>
+            <div class="sl"><span class="k">扩散</span><input type="range" min="0" max="200" value="100"><span class="val">100</span></div>
+            <label class="f" style="margin:10px 0 0"><span class="k">缩放</span>
+              <div class="seg"><button aria-pressed="true">自动</button><button>等比留白</button><button>拉伸</button></div>
+            </label>
+          </div>
+        </details>
+      </div>
+
+      <div>
+        <h2 class="sec">本次上传 · 3 / 6</h2>
+        <div class="prog"><i></i></div>
+        <div class="blist">
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_0.bmp</span><span class="st ok">已上传</span></div>
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_1.bmp</span><span class="st ok">已上传</span></div>
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_2.bmp</span><span class="st wait">上传中</span></div>
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_3.bmp</span><span class="st">等待</span></div>
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_4.bmp</span><span class="st err">失败</span></div>
+          <div class="bitem"><span class="th"></span><span class="nm">epd_at_0_20_20_50_100_1785307900_5.bmp</span><span class="st">等待</span></div>
+        </div>
+        <div class="btnrow" style="margin-top:16px">
+          <button class="btn solid" style="flex:2 1 180px">开始上传（6 张）</button>
+          <button class="btn">重试失败项</button>
+        </div>
+      </div>
+    </div>
+      </div>
+    </details>
+
+    <div class="inlinerow" style="margin-bottom:16px">
+      <label class="f grow" style="margin:0"><span class="k">播放目录</span>
+        <select><option>（根目录）· 58 张</option><option>猫咪 · 24 张</option><option>风景 · 31 张</option><option>梗图 · 12 张</option></select>
+      </label>
+      <div class="seg" style="flex:0 0 auto">
+        <button aria-pressed="true">最新</button><button>序号</button><button>随机一天</button><button>仅看已上屏</button>
+      </div>
+    </div>
+
+    <div class="contact">
+      <div class="cell" aria-current="true"><span class="im"></span><span class="lb"><span>001</span><span class="on">屏上</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>002</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>003</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>004</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>005</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>006</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>007</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>008</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>009</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>010</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>011</span><span>—</span></span></div>
+      <div class="cell"><span class="im"></span><span class="lb"><span>012</span><span>—</span></span></div>
+    </div>
+    <div class="pager"><a class="dis">‹</a><a>1</a><a aria-current="page">2</a><a>3</a><a>4</a><a>5</a><a>6</a><a>›</a></div>
+  </section>
+
+  <!-- ================= 上传 ================= -->
+
+
+  <!-- ================= 播放 ================= -->
+  <section id="p-play" class="hidden">
+    <div class="head">
+      <div><h1>播放</h1><p>轮播节奏、顺序与播放范围</p></div>
+      <div class="rt">当前<br><b>随机 · 每 90 分钟</b></div>
+    </div>
+
+    <div class="cols c2b">
+      <div>
+        <h2 class="sec">轮播</h2>
+        <div style="border:1px solid var(--rule);background:var(--card);padding:16px">
+          <label class="f" style="margin-bottom:6px"><span class="k">轮播间隔</span></label>
+          <div class="time">
+            <span class="step"><button aria-label="减少小时">−</button><input type="number" value="1" min="0" max="24" aria-label="小时"><button aria-label="增加小时">+</button></span><span class="u">时</span>
+            <span class="step"><button aria-label="减少分钟">−</button><input type="number" value="30" min="0" max="59" aria-label="分钟"><button aria-label="增加分钟">+</button></span><span class="u">分</span>
+          </div>
+          <div style="margin-top:8px;text-align:right"><span class="hint">= 90 分钟</span></div>
+
+          <div style="display:flex;align-items:center;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--rule)">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:600">自动轮播</div>
+              <div style="font-size:12px;color:var(--ink3)">关掉后只手动切图（BOOT 短按）</div>
+            </div>
+            <span class="sw" role="switch" aria-checked="true" tabindex="0"></span>
+          </div>
+
+          <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--rule)">
+            <label class="f" style="margin-bottom:8px"><span class="k">轮播方式</span></label>
+            <div class="seg"><button aria-pressed="false">顺序</button><button aria-pressed="false">倒序</button><button aria-pressed="true">随机</button></div>
+            <p style="font-size:12px;color:var(--ink3);margin-top:9px">随机＝洗牌不重复：一轮内每张只出现一次，走完自动重洗。</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="sec">播放目录</h2>
+        <div style="border:1px solid var(--rule);background:var(--card);padding:16px">
+          <label class="f"><span class="k">当前目录</span>
+            <select><option>（根目录）· 58 张</option><option>猫咪 · 24 张</option><option>风景 · 31 张</option></select>
+          </label>
+          <div class="inlinerow">
+            <label class="f grow" style="margin:0"><span class="k">新建分类目录</span>
+              <input type="text" placeholder="如 猫咪"></label>
+            <button class="btn">创建</button>
+          </div>
+        </div>
+
+        <h2 class="sec">休眠时段</h2>
+        <div style="border:1px solid var(--rule);background:var(--card);padding:16px">
+          <div class="inlinerow">
+            <label class="f grow" style="margin:0"><span class="k">停止轮播</span><input type="text" value="23:00" style="text-align:center"></label>
+            <span style="padding-bottom:11px;color:var(--ink3)">至</span>
+            <label class="f grow" style="margin:0"><span class="k">恢复轮播</span><input type="text" value="07:00" style="text-align:center"></label>
+          </div>
+          <p style="font-size:12px;color:var(--ink3);margin-top:12px">休眠期间不自动切图；手动切图仍然有效。</p>
+        </div>
+        <div class="btnrow" style="margin-top:16px"><button class="btn solid wide">保存播放设置</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 设置 ================= -->
+  <section id="p-settings" class="hidden">
+    <div class="head">
+      <div><h1>设置</h1><p>网络、Home Assistant 与设备信息</p></div>
+      <div class="rt">固件 v2.0.1<br>ESP-IDF v5.5.4</div>
+    </div>
+
+    <div class="cols c2b">
+      <div>
+        <h2 class="sec">网络</h2>
+        <div style="border:1px solid var(--rule);background:var(--card);padding:16px">
+          <div style="display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--rule);margin-bottom:16px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">qian-home</div>
+              <div style="font:12px var(--mono);color:var(--ink3)">192.168.3.95</div>
+            </div>
+            <span class="st ok">已连接</span>
+          </div>
+          <div class="btnrow" style="margin-bottom:16px">
+            <button class="btn">扫描网络</button><button class="btn red">重置配网</button>
+          </div>
+          <label class="f"><span class="k">SSID</span><input type="text" placeholder="选择或输入网络名"></label>
+          <label class="f"><span class="k">密码</span><input type="password" placeholder="••••••••"></label>
+          <button class="btn solid wide">连接</button>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="sec">Home Assistant</h2>
+        <div style="border:1px solid var(--rule);background:var(--card);padding:16px">
+          <div style="display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--rule);margin-bottom:16px">
+            <div style="flex:1"><div style="font-size:14px;font-weight:600">启用 MQTT</div>
+              <div style="font-size:12px;color:var(--ink3)">自动发现温度、电量、轮播开关等实体</div></div>
+            <span class="sw" role="switch" aria-checked="false" tabindex="0"></span>
+          </div>
+          <label class="f"><span class="k">Broker 地址</span><input type="text" placeholder="192.168.1.100"></label>
+          <label class="f"><span class="k">端口</span><input type="text" placeholder="1883"></label>
+          <label class="f"><span class="k">用户名（可选）</span><input type="text" placeholder="mqtt"></label>
+          <button class="btn solid wide">保存 MQTT 设置</button>
+        </div>
+
+        <h2 class="sec">设备信息</h2>
+        <div class="spec" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <div><div class="l">固件</div><div class="v" style="font-size:14px;font-family:var(--mono)">v2.0.1</div></div>
+          <div><div class="l">提交</div><div class="v" style="font-size:14px;font-family:var(--mono)">9ffa62d</div></div>
+          <div><div class="l">分区余量</div><div class="v" style="font-size:14px;font-family:var(--mono)">132 KB</div></div>
+          <div><div class="l">SD 卡</div><div class="v" style="font-size:14px">正常 · FAT32</div></div>
+        </div>
+        <div class="btnrow" style="margin-top:16px"><button class="btn red wide">重启设备</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ 弹层：图片操作 ============ -->
+<div class="backdrop" id="bd"></div>
+<div class="sheet" id="sheet">
+  <h3>epd_at_-50_4_4_69_98_1785307822.bmp</h3>
+  <p class="mut">2021.9.3 · 深圳 · 已上屏 2 次 · 序号 007</p>
+  <div class="frame" style="border:1px solid var(--rule2);background:#fff;padding:10px;margin:14px 0">
+    <span class="art" style="aspect-ratio:4/3;display:block;background:repeating-linear-gradient(0deg,rgba(31,34,38,.13) 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,rgba(31,34,38,.13) 0 1px,transparent 1px 3px),linear-gradient(150deg,#dfe7e9,#a9b6bb)"></span>
+  </div>
+  <div class="btnrow">
+    <button class="btn solid" style="flex:2 1 160px">显示到屏幕</button>
+    <button class="btn red">删除</button>
+  </div>
+</div>
+<div class="toast" id="toast">已保存（轮播间隔 01:30）</div>
+
+<!-- 设计稿专用：切换内容宽度，选好后告诉我（正式移植时删掉） -->
+<div class="wdsw" id="wdsw">
+  <span class="cap">内容宽度</span>
+  <input type="radio" name="cw" id="cw1120" data-w="1120"><label for="cw1120">窄</label>
+  <input type="radio" name="cw" id="cw1400" data-w="1400" checked><label for="cw1400">标准</label>
+  <input type="radio" name="cw" id="cw1600" data-w="1600"><label for="cw1600">宽</label>
+  <input type="radio" name="cw" id="cw0" data-w="0"><label for="cw0">铺满</label>
+  <input type="checkbox" id="cwnonav"><label for="cwnonav">隐藏侧栏</label>
+  <span class="now" id="cwnow"></span>
+</div>
+
+<script type="module">
+/* 设计稿交互仅为演示：页签 / 开关 / 分段 / 步进器 / 弹层 / 吐司 */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+let tt;
+function toast(m,err){const t=$('#toast');t.textContent=m;t.className='toast on'+(err?' err':'');
+  clearTimeout(tt);tt=setTimeout(()=>t.className='toast',2200)}
+
+function showTab(id){
+  $$('.tabs button').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.p===id)));
+  $$('main > section').forEach(s=>s.classList.toggle('hidden',s.id!==id));
+  window.scrollTo({top:0,behavior:'instant'});
+}
+$$('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.p));
+const _h=location.hash.slice(1);
+if(_h&&document.getElementById(_h)&&document.getElementById(_h).parentElement.tagName==='MAIN')showTab(_h);
+
+$$('.sw').forEach(el=>{
+  const flip=()=>{el.setAttribute('aria-checked',el.getAttribute('aria-checked')==='true'?'false':'true');
+    toast(el.getAttribute('aria-checked')==='true'?'已开启（演示）':'已关闭（演示）')};
+  el.onclick=flip;el.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();flip()}};
+});
+$$('.seg').forEach(s=>s.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  s.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));toast('已选：'+b.textContent)}));
+$$('.step').forEach(st=>{
+  const inp=st.querySelector('input'),[dec,inc]=st.querySelectorAll('button'),max=+inp.max||99;
+  const set=v=>{v=Math.max(0,Math.min(max,v|0));inp.value=v;
+    const box=st.closest('.time');if(box){const n=box.querySelectorAll('input');
+      toast('轮播间隔 '+n[0].value+' 时 '+n[1].value+' 分')}};
+  dec.onclick=()=>set(+inp.value-1);inc.onclick=()=>set(+inp.value+1);
+});
+$$('.contact .cell').forEach(p=>p.onclick=()=>{$('#sheet').classList.add('on');$('#bd').classList.add('on')});
+const close=()=>{$('#sheet').classList.remove('on');$('#bd').classList.remove('on')};
+$('#bd').onclick=close;
+$$('#sheet .btn').forEach(b=>b.onclick=()=>{toast(b.textContent+' — 演示');close()});
+$$('.btn').forEach(b=>{if(!b.closest('#sheet')&&!b.closest('.seg'))b.onclick=()=>toast(b.textContent.trim()+' — 演示（未接后端）')});
+
+/* 设计稿专用：内容宽度切换（侧栏始终贴左，只改内容的定宽/居中）
+   注意：宽度本身已由 radio + :has() 的纯 CSS 负责，这里只做持久化与“实际生效宽度”读数 */
+(function(){
+  const box=document.querySelector('#wdsw'); if(!box) return;
+  const main=document.querySelector('main'), now=document.querySelector('#cwnow');
+  const radios=[...box.querySelectorAll('input[type=radio]')];
+  const nonav=box.querySelector('#cwnonav');
+  let want=1400;
+  const show=()=>{
+    if(!now) return;
+    const act=Math.round(main.getBoundingClientRect().width);
+    now.textContent = (want>0 && act < want-4) ? act+'px（视口仅 '+innerWidth+'px）' : act+'px';
+  };
+  const apply=w=>{
+    want=w;
+    main.style.maxWidth = w>0 ? w+'px' : 'none';     /* 铺满 = 不设上限 */
+    show();
+    try{localStorage.setItem('designW',String(w))}catch(e){}
+  };
+  radios.forEach(r=>r.addEventListener('change',()=>{ if(r.checked) apply(+r.dataset.w) }));
+  if(nonav){
+    nonav.addEventListener('change',()=>{ show();
+      try{localStorage.setItem('designNonav',nonav.checked?'1':'0')}catch(e){} });
+    try{ if(localStorage.getItem('designNonav')==='1') nonav.checked=true; }catch(e){}
+  }
+  try{
+    const s=localStorage.getItem('designW');
+    if(s!==null){ const r=radios.find(x=>+x.dataset.w===+s); if(r){ r.checked=true; want=+s; } }
+  }catch(e){}
+  apply(want);
+  addEventListener('resize',show);
+})();
+
+/* --- 窄屏自检 -------------------------------------------------------------
+   手机断点设在 641px，而 Edge 无头模式布局视口最小 ~496px，因此
+   --window-size=496 就能触发手机版式；?w=NNN 再模拟更窄的机型（如 360）。
+   ?measure=1 把“右边界超出界面宽度”的元素写到页面顶部。 */
+const _m=(location.search.match(/[?&]w=(\d+)/)||[])[1];
+if(_m){
+  const w=+_m;
+  document.documentElement.style.width=w+'px';
+  document.body.style.width=w+'px';
+  const nav=document.querySelector('.nav');
+  nav.style.width=w+'px';nav.style.left='0';nav.style.right='auto';
+  document.querySelector('main').style.maxWidth=w+'px';
+}
+if(location.search.indexOf('measure')>=0){
+  /* 参考宽度：模拟窄屏时用 ?w= 指定的宽度，否则用真实视口宽度。
+     注意不能用 main 的 width 当参考——PC 下 main 前面有侧栏，right 天然大于 width。 */
+  const refW = _m ? +_m : document.documentElement.clientWidth, bad=[];
+  $$('body *').forEach(el=>{
+    if(el.id==='measure')return;
+    /* 遮罩 / 弹层 / 吐司是铺满视口的固定层，整棵子树都不算“内容溢出” */
+    if(el.closest('.backdrop')||el.closest('.sheet')||el.closest('.toast'))return;
+    const r=el.getBoundingClientRect();
+    if(r.width===0&&r.height===0)return;
+    if(r.right>refW+1.5||r.left<-1.5){
+      const tag=el.tagName.toLowerCase()+(el.className?'.'+String(el.className).trim().split(/\s+/).join('.'):'');
+      const pid=el.parentElement?(el.parentElement.tagName.toLowerCase()+(el.parentElement.className?'.'+String(el.parentElement.className).trim().split(/\s+/)[0]:'')):'-';
+      bad.push(tag+'  right='+Math.round(r.right)+' w='+Math.round(r.width)
+        +'  <'+pid+'>  '+(el.outerHTML||'').slice(0,58).replace(/\s+/g,' '));
+    }
+  });
+  const pre=document.createElement('pre');pre.id='measure';
+  pre.textContent='refWidth='+refW+'  viewport='+document.documentElement.clientWidth
+    +'  bodyScrollWidth='+document.body.scrollWidth
+    +'\noverflowCount='+bad.length+'\n'+(bad.slice(0,18).join('\n')||'(none)');
+  document.body.prepend(pre);
+}
+</script>
+</body>
+</html>

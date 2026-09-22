@@ -50,6 +50,38 @@ if str(FONT_PATH) and not FONT_PATH.is_absolute():
     FONT_PATH = (ROOT_DIR / FONT_PATH).resolve()
 
 MEMORY_THRESHOLD = float(getattr(cfg, "MEMORY_THRESHOLD", 70.0) or 70.0)
+# 网络图三个维度的独立阈值（梗图库按 funny 选、插画按 art 选，各自标定更准）
+FUNNY_THRESHOLD = float(getattr(cfg, "FUNNY_THRESHOLD", MEMORY_THRESHOLD) or MEMORY_THRESHOLD)
+DEPTH_THRESHOLD = float(getattr(cfg, "DEPTH_THRESHOLD", MEMORY_THRESHOLD) or MEMORY_THRESHOLD)
+ART_THRESHOLD = float(getattr(cfg, "ART_THRESHOLD", MEMORY_THRESHOLD) or MEMORY_THRESHOLD)
+
+
+def _qualifies(it: Dict[str, Any]) -> bool:
+    """是否够格入选：真实照片看 memory；网络图看对应维度的独立阈值。
+    任一维度达标即可（memes 没有 memory 分，插画可能没有 funny 分）。"""
+    m = it.get("memory", -1.0)
+    if m is not None and m > MEMORY_THRESHOLD:
+        return True
+    for key, th in (("funny", FUNNY_THRESHOLD), ("depth", DEPTH_THRESHOLD), ("art", ART_THRESHOLD)):
+        v = it.get(key, -1.0)
+        if v is not None and v > th:
+            return True
+    return False
+
+
+def _rank(it: Dict[str, Any]) -> float:
+    """选片用的统一分数。
+
+    真实照片看回忆度；网络图（表情包/梗图/二次元插画）按提示词设计**没有** memory_score，
+    此时改用 有趣/深度/艺术 里的最高分 —— 否则整个梗图库会因为 memory 全是 -1
+    而一张都选不出来（`> MEMORY_THRESHOLD` 对 -1 恒不成立）。
+    """
+    m = it.get("memory", -1.0)
+    if m is not None and m >= 0:
+        return float(m)
+    vals = [float(it.get(k, -1.0)) for k in ("funny", "depth", "art")]
+    vals = [v for v in vals if v is not None and v >= 0]
+    return max(vals) if vals else -1.0
 DAILY_PHOTO_QUANTITY = int(getattr(cfg, "DAILY_PHOTO_QUANTITY", 5) or 5)
 
 # === 渲染方案与推送（来自 config.py） ===
@@ -116,6 +148,10 @@ def load_sim_rows() -> List[Dict[str, Any]]:
                exif_json,
                side_caption,
                memory_score,
+               funny_score,
+               depth_score,
+               art_score,
+               type,
                exif_gps_lat,
                exif_gps_lon,
                exif_city
@@ -126,7 +162,8 @@ def load_sim_rows() -> List[Dict[str, Any]]:
     conn.close()
 
     items: List[Dict[str, Any]] = []
-    for path, exif_json, side_caption, memory_score, gps_lat, gps_lon, exif_city in rows:
+    for (path, exif_json, side_caption, memory_score, funny_score, depth_score, art_score,
+         ptype, gps_lat, gps_lon, exif_city) in rows:
         date_str = extract_date_from_exif(exif_json)
         if not date_str:
             continue
@@ -146,6 +183,10 @@ def load_sim_rows() -> List[Dict[str, Any]]:
             "md": md,          # MM-DD
             "side": side_caption or "",
             "memory": float(memory_score) if memory_score is not None else -1.0,
+            "funny": float(funny_score) if funny_score is not None else -1.0,
+            "depth": float(depth_score) if depth_score is not None else -1.0,
+            "art": float(art_score) if art_score is not None else -1.0,
+            "type": ptype or "",
             "lat": gps_lat,
             "lon": gps_lon,
             "city": exif_city or "",
@@ -195,7 +236,7 @@ def choose_photo_for_today(items: List[Dict[str, Any]], today: dt.date) -> Tuple
 
     # 每组内按 memory 从高到低排序
     for arr in by_md.values():
-        arr.sort(key=lambda x: x.get("memory", -1.0), reverse=True)
+        arr.sort(key=_rank, reverse=True)
 
     target_md = f"{today.month:02d}-{today.day:02d}"
     target_doy = md_to_day_of_year(target_md)
@@ -213,7 +254,7 @@ def choose_photo_for_today(items: List[Dict[str, Any]], today: dt.date) -> Tuple
         arr = by_md.get(md, [])
         if not arr:
             continue
-        candidates = [p for p in arr if p.get("memory", -1.0) > MEMORY_THRESHOLD]
+        candidates = [p for p in arr if _qualifies(p)]
         if not candidates:
             continue
 
@@ -229,7 +270,7 @@ def choose_photo_for_today(items: List[Dict[str, Any]], today: dt.date) -> Tuple
         }
         return chosen, info
 
-    global_best = max(items, key=lambda x: x.get("memory", -1.0))
+    global_best = max(items, key=_rank)
     info = {
         "target_md": target_md,
         "used_md": global_best["md"],
@@ -260,7 +301,7 @@ def choose_photos_for_today(items: List[Dict[str, Any]], today: dt.date, count: 
 
     # 每组内按 memory 从高到低排序
     for arr in by_md.values():
-        arr.sort(key=lambda x: x.get("memory", -1.0), reverse=True)
+        arr.sort(key=_rank, reverse=True)
 
     target_md = f"{today.month:02d}-{today.day:02d}"
     target_doy = md_to_day_of_year(target_md)
@@ -278,7 +319,7 @@ def choose_photos_for_today(items: List[Dict[str, Any]], today: dt.date, count: 
         arr = by_md.get(md, [])
         if not arr:
             continue
-        candidates = [p for p in arr if p.get("memory", -1.0) > MEMORY_THRESHOLD]
+        candidates = [p for p in arr if _qualifies(p)]
         if not candidates:
             continue
 
@@ -307,7 +348,7 @@ def choose_photos_for_today(items: List[Dict[str, Any]], today: dt.date, count: 
         return chosen_list, info
 
     # 兜底：全局回忆度最高的若干张
-    sorted_all = sorted(items, key=lambda x: x.get("memory", -1.0), reverse=True)
+    sorted_all = sorted(items, key=_rank, reverse=True)
     chosen_list = sorted_all[:count]
     info = {
         "target_md": target_md,
@@ -486,7 +527,7 @@ def main():
     for idx, chosen in enumerate(photos):
         print(f"[INFO] 第 {idx} 张选中照片:", chosen["path"])
         print("[INFO] 拍摄日期:", chosen["date"])
-        print("[INFO] 回忆度:", chosen["memory"])
+        print("[INFO] 选片分:", round(_rank(chosen), 1), "  (回忆度:", chosen["memory"], ")")
         print("[DEBUG] 城市:", chosen.get("city", ""))
         print("[DEBUG] 经纬度:", chosen.get("lat"), chosen.get("lon"))
         print("[DEBUG] 文案:", chosen.get("side", ""))

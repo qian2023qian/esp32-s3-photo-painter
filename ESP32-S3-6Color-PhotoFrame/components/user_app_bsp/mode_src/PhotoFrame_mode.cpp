@@ -191,7 +191,9 @@ extern "C" void photo_rescan_current_dir(void)
     ESP_LOGI(TAG, "播放目录 %s : %lu 张", path, photo_img_count);
 }
 
-/* 切换播放目录（dir 为空 = 根目录）。重扫 + 持久化 + 立刻上屏 */
+/* 切换播放目录（dir 为空 = 根目录）。重扫 + 持久化，但**不刷屏**：
+   切目录只是改变接下来播放哪一批图，不应该把用户正在看的画面顶掉
+   （想立刻看到新目录的图，等下一次轮播或按 BOOT 短按切图即可） */
 extern "C" void photo_set_dir(const char *dir)
 {
     char clean[sizeof(photo_dir)] = "";
@@ -204,7 +206,6 @@ extern "C" void photo_set_dir(const char *dir)
     photo_img_index = 0;
     photo_rescan_current_dir();
     photo_persist_settings();
-    xEventGroupSetBits(epaper_groups, set_bit_button(0));
 }
 
 /* 设置轮播方式（0=顺序 1=倒序 2=随机） */
@@ -380,13 +381,18 @@ static bool is_sleep_time(void)
     else              return (cur >= start || cur < end);         // 跨日
 }
 
+/* 轮播计时的对外可见状态：slideshow_task 每分钟一个 tick，tick_minute 累加到
+   photo_interval 就切图。提到文件作用域是为了让仪表盘能算出“下次切图还有多久”。 */
+static int     g_tick_minute   = 0;
+static int64_t g_tick_start_us = 0;   // 本 tick 的起点（esp_timer），0 = 任务尚未跑过一轮
+
 /* ---- Slideshow Task ---- */
 static void slideshow_task(void *arg)
 {
     // 每分钟检查一次，避免长 vTaskDelay 导致休眠结束后无法及时恢复
-    int tick_minute = 0;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(60 * 1000));
+        g_tick_start_us = esp_timer_get_time();
 
         /* 低电量检测（独立于轮播开关）：<10% 暂停轮播并显示电量页，充电≥15% 恢复。
            注意：**充电中完全不做低电量处理**。
@@ -415,15 +421,38 @@ static void slideshow_task(void *arg)
             if (photo_show_battery_page(true)) battery_page_dirty = false;
         }
 
-        if (!photo_running || low_battery_active || photo_img_count == 0) { tick_minute = 0; continue; }
-        if (is_sleep_time()) { tick_minute = 0; continue; }
-        tick_minute++;
-        if (tick_minute >= photo_interval) {
-            tick_minute = 0;
+        if (!photo_running || low_battery_active || photo_img_count == 0) { g_tick_minute = 0; continue; }
+        if (is_sleep_time()) { g_tick_minute = 0; continue; }
+        g_tick_minute++;
+        if (g_tick_minute >= photo_interval) {
+            g_tick_minute = 0;
             photo_img_index = photo_calc_next(photo_img_index);   // 顺序/倒序/随机
             xEventGroupSetBits(epaper_groups, set_bit_button(0));
         }
     }
+}
+
+/* ---- 下次自动切图（给仪表盘显示） ----
+   剩余时间 = (photo_interval - tick_minute) * 60 - 本 tick 已过的秒数。
+   返回 -1 表示当前不会自动切图，具体原因由 photo_next_switch_state() 给出。 */
+extern "C" int photo_next_switch_in(void)
+{
+    if (photo_img_count == 0 || !photo_running || low_battery_active) return -1;
+    if (is_sleep_time()) return -1;
+    if (g_tick_start_us == 0) return -1;                  /* 任务还没跑过第一轮 */
+    int remain  = photo_interval - g_tick_minute;         /* >= 1 */
+    int elapsed = (int)((esp_timer_get_time() - g_tick_start_us) / 1000000);
+    int sec     = remain * 60 - elapsed;
+    return sec < 0 ? 0 : sec;
+}
+
+extern "C" const char *photo_next_switch_state(void)
+{
+    if (photo_img_count == 0) return "empty";
+    if (!photo_running)       return "paused";
+    if (low_battery_active)   return "lowbat";
+    if (is_sleep_time())      return "sleep";
+    return "ok";
 }
 
 /* ---- Button Task ---- */
