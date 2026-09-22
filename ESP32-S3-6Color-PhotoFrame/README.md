@@ -214,6 +214,8 @@ idf.py -p COMx flash monitor
 
 前端 bundle 由 ESP32 直接以 `/lib/epdoptimize.js`、`/lib/opendisplay.js` 提供（`components/user_app_bsp/mode_src/dashboard.html` 同源生成）。
 
+> 两套管线的上游原项目：[paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)（v1.3.0）与 [OpenDisplay/epaper-dithering](https://github.com/OpenDisplay/epaper-dithering)（v5.0.9，npm `@opendisplay/epaper-dithering`），以浏览器端 bundle 形式内嵌，各自遵循其上游许可。
+
 ---
 
 ## 上传文件名格式

@@ -9,7 +9,7 @@
 | 目录 | 来源 | 许可 |
 |------|------|------|
 | `ESP32-S3-6Color-PhotoFrame/` | 基于**微雪官方固件**（ESP32-S3-PhotoPainter）修改。该官方固件本身是 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 的衍生——微雪例程目录即 `01_Example/xiaozhi-esp32`，其 README 亦注明"该项目使用了虾哥 xiaozhi-esp32 开源项目"。本固件的框架层（`main/`，含小智 AI 语音、LVGL、协议栈）与相框应用层（`components/`）分别来自这条链路 | xiaozhi-esp32 部分为 MIT，Copyright (c) 2025 Shenzhen Xinzhi Future Technology Co., Ltd.（原许可见该目录下 `LICENSE`）；微雪官方代码部分见其发行包内声明 |
-| `AI-Photo-Picker/` | 衍生自 upstream 的 MIT 项目 | MIT，Copyright (c) 2025 dai-hongtao（原许可见该目录下 `LICENSE`） |
+| `AI-Photo-Picker/` | 衍生自 [InkTime](https://github.com/dai-hongtao/InkTime)（一个自托管的墨水屏相框项目：用 AI 分析照片库、按"值得回忆度"打分，并按"历史上的今天"自动选片）—— 本仓库的 PC 端选片工具在其思路与打分维度基础上重写，并扩展了 6 色渲染、调色与推送流程 | MIT，Copyright (c) 2025 dai-hongtao（原许可见该目录下 `LICENSE`） |
 
 ## 2. 第三方组件
 
@@ -19,7 +19,9 @@
 | [LVGL](https://lvgl.io/) | 图形库 | MIT |
 | [XPowersLib](https://github.com/lewisxhe/XPowersLib) | AXP2101 电源管理驱动 | MIT，Copyright (c) Lewis He |
 | [multi_button](https://github.com/0x1abin/MultiButton) | 按键驱动 | MIT |
-| 墨水屏驱动 / `epdoptimize` / `OpenDisplay` | 6 色渲染与点阵字库 | 见 `ESP32-S3-6Color-PhotoFrame/` 内各文件的头部声明 |
+| 墨水屏驱动 / 点阵字库 | 6 色渲染底层 | 见 `ESP32-S3-6Color-PhotoFrame/` 内各文件的头部声明 |
+| [epdoptimize](https://github.com/paperlesspaper/epdoptimize) | **调色管线之一**（`epd` 管线）：降色 + 抖动，输出 6 色 BMP。以 ESM bundle 形式内嵌（`epdoptimize_bundle.h`，v1.3.0），浏览器端本地运行 | 见上游仓库 |
+| [OpenDisplay/epaper-dithering](https://github.com/OpenDisplay/epaper-dithering) | **调色管线之二**（`od` 管线）：Spectra 6 等墨水屏的色彩方案与抖动（含 WASM bundle `opendisplay_bundle.h`，v5.0.9）。npm 包名 `@opendisplay/epaper-dithering` | 见上游仓库 |
 
 ## 3. 数据集
 

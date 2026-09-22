@@ -221,3 +221,17 @@ python main.py serve [--host 0.0.0.0] [--port 8765]
 - **渲染方向**：`render_pipeline` 按“高 > 宽用竖屏 480×800，否则横屏 800×480”自动适配；`render_daily_photo` 固定按竖屏 480×800 构图（照片 + 底部文案区）。
 
 更多关于墨水屏固件（解析、刷新、SD 卡目录、NVS 模式等）的说明见上层 `ESP32-S3-PhotoPainter/CLAUDE.md`。
+
+---
+
+## 致谢 / 参考项目
+
+- **参考项目**：[dai-hongtao/InkTime](https://github.com/dai-hongtao/InkTime) —— 自托管的墨水屏相框，
+  用 AI 分析照片库并按「值得回忆度」打分、按「历史上的今天」自动选片。本工具的思路与打分维度参考该项目，
+  并在其基础上重写、扩展了 6 色渲染与推送流程（原许可：MIT，Copyright (c) 2025 dai-hongtao）。
+- **调色管线（两套）**：
+  - [`epd` 管线](https://github.com/paperlesspaper/epdoptimize)：降色 + 抖动（v1.3.0），以浏览器端 bundle 内嵌；
+  - [`od` 管线](https://github.com/OpenDisplay/epaper-dithering)：Spectra 6 色彩方案与抖动（v5.0.9，
+    npm `@opendisplay/epaper-dithering`），同样以 bundle 内嵌。
+- **城市数据**：[GeoNames](https://www.geonames.org/)（CC BY 4.0），见 `data/world_cities_zh.csv`。
+- **EXIF 读取**：可选依赖 [ExifTool](https://exiftool.org/)（GPS/城市解析用）。

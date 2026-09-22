@@ -101,5 +101,12 @@ esptool.py --chip esp32s3 -b 460800 --before default_reset --after hard_reset \
 
 仓库内含**第三方开源代码的衍生作品**（`ESP32-S3-6Color-PhotoFrame/` 基于微雪官方固件，该固件本身
 源自 xiaozhi-esp32；`AI-Photo-Picker/` 源自另一个 MIT 项目），它们各自保留原有版权与许可声明，**不**被重新授权；
-另有若干第三方组件与数据集（ESP-IDF、LVGL、XPowersLib、GeoNames 城市数据等）遵循其自身许可。
+另有若干第三方组件与数据集遵循其自身许可。其中：
+
+- **AI 选片工具的参考项目**：[dai-hongtao/InkTime](https://github.com/dai-hongtao/InkTime)
+  —— PC 端选片（AI 打分 + 「历史上的今天」选片）的思路与打分维度参考该项目；
+- **两套调色管线的原项目**：`epd` 管线来自 [paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)（v1.3.0），
+  `od` 管线来自 [OpenDisplay/epaper-dithering](https://github.com/OpenDisplay/epaper-dithering)（v5.0.9）——
+  两者均以浏览器端 bundle 形式内嵌，负责降色与抖动；
+- 其余（ESP-IDF、LVGL、XPowersLib、GeoNames 城市数据等）见 [`NOTICE.md`](NOTICE.md)。
 完整清单见 [`NOTICE.md`](NOTICE.md)。
