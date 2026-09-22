@@ -527,7 +527,7 @@ def build_html(rows, page: int, page_size: int, total_count: int, sel_type: str 
                     <img src="{img_uri}" loading="lazy">
                 </a>
             </div>
-            {f'<div class="side-under">{safe_side}</div>' if safe_side else ''}
+            {f'<div class="side-under">文案: {safe_side}</div>' if safe_side else ''}
             <div class="meta">
                 <div class="path">{html.escape(str(path))}</div>
                 {type_html}
@@ -540,7 +540,7 @@ def build_html(rows, page: int, page_size: int, total_count: int, sel_type: str 
                     {(" · 方向: " + html.escape(orient_str)) if orient_str else ""}
                     {(" · 已上屏: " + html.escape(used_str)) if used_str else ""}
                 </div>
-                <div class="caption">{safe_caption}</div>
+                <div class="caption">描述: {safe_caption}</div>
             </div>
         </div>
         """)
