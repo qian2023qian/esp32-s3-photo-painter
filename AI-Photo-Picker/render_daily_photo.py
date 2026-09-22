@@ -50,6 +50,23 @@ if str(FONT_PATH) and not FONT_PATH.is_absolute():
     FONT_PATH = (ROOT_DIR / FONT_PATH).resolve()
 
 MEMORY_THRESHOLD = float(getattr(cfg, "MEMORY_THRESHOLD", 70.0) or 70.0)
+# 网络图三个维度的独立阈值（梗图库按 funny 选、插画按 art 选，各自标定更准）
+FUNNY_THRESHOLD = float(getattr(cfg, "FUNNY_THRESHOLD", MEMORY_THRESHOLD) or MEMORY_THRESHOLD)
+DEPTH_THRESHOLD = float(getattr(cfg, "DEPTH_THRESHOLD", MEMORY_THRESHOLD) or MEMORY_THRESHOLD)
+ART_THRESHOLD = float(getattr(cfg, "ART_THRESHOLD", MEMORY_THRESHOLD) or MEMORY_THRESHOLD)
+
+
+def _qualifies(it: Dict[str, Any]) -> bool:
+    """是否够格入选：真实照片看 memory；网络图看对应维度的独立阈值。
+    任一维度达标即可（memes 没有 memory 分，插画可能没有 funny 分）。"""
+    m = it.get("memory", -1.0)
+    if m is not None and m > MEMORY_THRESHOLD:
+        return True
+    for key, th in (("funny", FUNNY_THRESHOLD), ("depth", DEPTH_THRESHOLD), ("art", ART_THRESHOLD)):
+        v = it.get(key, -1.0)
+        if v is not None and v > th:
+            return True
+    return False
 
 
 def _rank(it: Dict[str, Any]) -> float:
@@ -237,7 +254,7 @@ def choose_photo_for_today(items: List[Dict[str, Any]], today: dt.date) -> Tuple
         arr = by_md.get(md, [])
         if not arr:
             continue
-        candidates = [p for p in arr if _rank(p) > MEMORY_THRESHOLD]
+        candidates = [p for p in arr if _qualifies(p)]
         if not candidates:
             continue
 
@@ -302,7 +319,7 @@ def choose_photos_for_today(items: List[Dict[str, Any]], today: dt.date, count: 
         arr = by_md.get(md, [])
         if not arr:
             continue
-        candidates = [p for p in arr if _rank(p) > MEMORY_THRESHOLD]
+        candidates = [p for p in arr if _qualifies(p)]
         if not candidates:
             continue
 

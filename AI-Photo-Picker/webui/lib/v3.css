@@ -162,16 +162,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
 /* ---------- 评分条（/sim） ---------- */
 .srow{display:flex;align-items:center;gap:10px;margin:6px 0;min-width:0}
-.sbar{flex:1 1 auto;height:16px;min-width:60px;background:#fff;border:2px solid var(--ink);overflow:hidden}
+/* 限宽：原来 flex:1 会拉满整行，一条 72 分的条能有上千像素长，很难看出差距 */
+.sbar{flex:0 1 320px;height:16px;min-width:80px;background:#fff;border:2px solid var(--ink);overflow:hidden}
 .sbar-fill{height:100%;background:var(--b);transition:width .25s}
 /* 五个评分维度各给一个 v3 色（原来是渐变色，改成平色更贴粗野风） */
 .sbar-fill.mem{background:var(--b)}
-.sbar-fill.bea{background:var(--y)}
-.sbar-fill.fun{background:var(--r)}
-.sbar-fill.dep{background:var(--g)}
-.sbar-fill.art{background:var(--ink)}
+.sbar-fill.bea{background:var(--g)}
+.sbar-fill.fun{background:var(--y)}
+.sbar-fill.dep{background:var(--ink)}
+.sbar-fill.art{background:var(--r)}
 .sval,.sval2{font:700 13px var(--mono);color:var(--ink2)}
-.sval2{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sval2{flex:1 1 auto;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+/* 原来 nowrap+省略号会把「描述」「理由」截断，信息展示不全 */
+.srow.wrap{align-items:flex-start}
+.srow.wrap .skey{padding-top:2px}
 
 /* ---------- 设置页字段 ---------- */
 .ch-f{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}

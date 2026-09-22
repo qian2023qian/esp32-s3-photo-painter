@@ -1473,6 +1473,9 @@ _SETTINGS_HTML = """<!doctype html>
 </fieldset>
 <fieldset><legend>选片阈值</legend>
 <label><span>回忆度阈值</span><input name="MEMORY_THRESHOLD" type="number" step="0.1"></label>
+<label><span>有趣度阈值</span><input name="FUNNY_THRESHOLD" type="number" step="0.1"></label>
+<label><span>深度阈值</span><input name="DEPTH_THRESHOLD" type="number" step="0.1"></label>
+<label><span>艺术度阈值</span><input name="ART_THRESHOLD" type="number" step="0.1"></label>
 <label><span>每日数量</span><input name="DAILY_PHOTO_QUANTITY" type="number"></label>
 </fieldset>
 <fieldset><legend>WebUI</legend>
@@ -1526,7 +1529,7 @@ async function saveCfg(e){
   data.API_CHANNELS=collectChannels();
   data.PUSH_ENABLED=document.querySelector('[name=PUSH_ENABLED]').checked;
   data.ENABLE_REVIEW_WEBUI=document.querySelector('[name=ENABLE_REVIEW_WEBUI]').checked;
-  for(const k of ['BATCH_LIMIT','TIMEOUT','CHANNEL_FAILOVER_COOLDOWN_SEC','VLM_MAX_LONG_EDGE','ESP32_PORT','AI_MAX_FILES','MEMORY_THRESHOLD','DAILY_PHOTO_QUANTITY','FLASK_PORT']){
+  for(const k of ['BATCH_LIMIT','TIMEOUT','CHANNEL_FAILOVER_COOLDOWN_SEC','VLM_MAX_LONG_EDGE','ESP32_PORT','AI_MAX_FILES','MEMORY_THRESHOLD','FUNNY_THRESHOLD','DEPTH_THRESHOLD','ART_THRESHOLD','DAILY_PHOTO_QUANTITY','FLASK_PORT']){
     if(data[k]!==undefined&&data[k]!=='')data[k]=Number(data[k]);
   }
   const r=await post('/api/settings',data);

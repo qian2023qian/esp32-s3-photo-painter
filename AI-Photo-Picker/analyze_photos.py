@@ -512,11 +512,30 @@ def filter_unscored(conn: sqlite3.Connection, paths: list[Path]) -> list[Path]:
 
 
 def _convert_gps_to_deg(value):
+    """(度, 分, 秒) -> 十进制度。
+
+    兼容两种来源：exiftool 给的是 (分子, 分母) 分数对；Pillow 给的是 IFDRational
+    （可以直接 float()，但没有 [0]/[1]）—— 旧实现只认前者，于是 Pillow 读取的 GPS
+    一律抛异常返回 None，GPS/城市功能实际从未生效过。
+    """
     try:
         d, m, s = value
-        return float(d[0]) / float(d[1]) + float(m[0]) / float(m[1]) / 60.0 + float(s[0]) / float(s[1]) / 3600.0
     except Exception:
         return None
+
+    def _f(x):
+        try:
+            return float(x)                        # IFDRational / int / float
+        except Exception:
+            try:
+                return float(x[0]) / float(x[1])   # (分子, 分母)
+            except Exception:
+                return None
+
+    dv, mv, sv = _f(d), _f(m), _f(s)
+    if dv is None or mv is None or sv is None:
+        return None
+    return dv + mv / 60.0 + sv / 3600.0
 
 
 def read_gps_with_exiftool(path: Path):
@@ -643,6 +662,28 @@ def read_exif(path: Path) -> dict:
                     lon = -lon
     except Exception:
         pass
+
+    # 方式 3：Pillow 现代接口直接读 GPS 子 IFD。
+    # 说明：本函数早先用 _getexif()/exif.get("GPSInfo") 取 GPS，实测在 vivo 等手机照片上
+    # 拿不到（GPS 在独立的 0x8825 子 IFD 里），导致 exif_gps_lat/lon 全是 null、城市解析永远为空。
+    if lat is None or lon is None:
+        try:
+            from PIL import Image as _Image
+            with _Image.open(path) as _im:
+                _gps = _im.getexif().get_ifd(0x8825)
+            if _gps:
+                _t = {ExifTags.GPSTAGS.get(k, k): v for k, v in _gps.items()}
+                _lv, _ln = _t.get("GPSLatitude"), _t.get("GPSLongitude")
+                if _lv is not None:
+                    lat = _convert_gps_to_deg(_lv)
+                    if lat is not None and str(_t.get("GPSLatitudeRef", "N")).upper().startswith("S"):
+                        lat = -lat
+                if _ln is not None:
+                    lon = _convert_gps_to_deg(_ln)
+                    if lon is not None and str(_t.get("GPSLongitudeRef", "E")).upper().startswith("W"):
+                        lon = -lon
+        except Exception:
+            pass
 
     # 方式 2：降级到旧的 GPSInfo dict（某些 JPEG 可能走这条路径）
     if lat is None or lon is None:
