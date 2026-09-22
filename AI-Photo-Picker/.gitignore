@@ -6,7 +6,7 @@ venv/
 
 # 用户配置（含 API 密钥）与数据库
 settings.json
-photos.db
+photos*.db
 filelist.txt
 *.log
 logs/
