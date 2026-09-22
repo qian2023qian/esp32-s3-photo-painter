@@ -72,13 +72,13 @@ python main.py serve       # 打开 WebUI 浏览/渲染/推送
 
 | 文件 | 用途 | 烧录偏移 |
 |------|------|----------|
-| `ESP32-S3-PhotoPainter-v2.0.1-merged.bin` | 单文件镜像（bootloader + 分区表 + 应用），**首次刷写用** | `0x0` |
-| `ESP32-S3-PhotoPainter-v2.0.1-app.bin` | 仅应用，用于升级 | `0x20000` |
+| `ESP32-S3-PhotoPainter-v2.1.0-merged.bin` | 单文件镜像（bootloader + 分区表 + 应用），**首次刷写用** | `0x0` |
+| `ESP32-S3-PhotoPainter-v2.1.0-app.bin` | 仅应用，用于升级 | `0x20000` |
 
 ```bash
 # 首次刷写（单文件，一条命令搞定）
 esptool.py --chip esp32s3 -b 460800 --before default_reset --after hard_reset \
-  write_flash 0x0 ESP32-S3-PhotoPainter-v2.0.1-merged.bin
+  write_flash 0x0 ESP32-S3-PhotoPainter-v2.1.0-merged.bin
 ```
 
 > ⚠️ 单文件镜像从 `0x0` 写入，会**覆盖 NVS 分区**（`0x9000`）→ WiFi 凭据与相框设置被清空，
